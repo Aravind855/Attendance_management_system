@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 import random
 from .mongodb import users_collection, admins_collection
 from django.contrib.auth.hashers import make_password
+from django.db import models
+from django.contrib.auth.models import User
 
 class CustomUser:
     @staticmethod
@@ -16,7 +18,6 @@ class CustomUser:
             "otp_valid_until": None
         }
         
-        # Choose collection based on user type
         collection = admins_collection if user_type == 'admin' else users_collection
         return collection.insert_one(user)
 
@@ -55,3 +56,15 @@ class CustomUser:
                 }
             }
         )
+
+class Student(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)  # Assuming you want to link to the User model
+    registration_no = models.CharField(max_length=100, unique=True)
+    department = models.CharField(max_length=100)
+    mobile_number = models.CharField(max_length=15)
+    gender = models.CharField(max_length=10)
+    dob = models.DateField()
+    academic_year = models.CharField(max_length=20)
+
+    def __str__(self):
+        return self.user.username  # or any other field you want to represent the student

@@ -56,15 +56,6 @@ TEMPLATES = [
 
 CORS_ALLOW_ALL_ORIGINS = True
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'djongo',
-#         'NAME': 'login_system',
-#         'HOST': 'localhost',
-#         'PORT': 27017,
-#     }
-# }
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -81,8 +72,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'aravind.mfai@gmail.com'  # Replace with your email
-EMAIL_HOST_PASSWORD = 'plgg ywzy qvdu nbvm'  # Replace with your password
+EMAIL_HOST_USER = "aravind.mfai@gmail.com"
+EMAIL_HOST_PASSWORD = "plgg ywzy qvdu nbvm"
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # For debugging email issues

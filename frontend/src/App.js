@@ -10,6 +10,7 @@ import ResetPassword from './components/ResetPassword';
 import Profile from './components/Profile';
 import { AppBar, Toolbar, Button, Container, Box } from '@mui/material';
 import ErrorBoundary from './components/ErrorBoundary';
+import StudentForm from './components/StudentForm';
 
 function App() {
   // Get current path
@@ -44,6 +45,7 @@ function App() {
               <Route path="/" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path='/StudentForm' element={<StudentForm/>} />
             </Routes>
           </Container>
         </Box>
