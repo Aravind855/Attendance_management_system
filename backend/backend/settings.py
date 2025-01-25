@@ -67,7 +67,7 @@ STATIC_URL = 'static/'
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Email Configuration
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
@@ -76,7 +76,7 @@ EMAIL_HOST_USER = "aravind.mfai@gmail.com"
 EMAIL_HOST_PASSWORD = "plgg ywzy qvdu nbvm"
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-# For debugging email issues
+
 if DEBUG:
     EMAIL_DEBUG = True
     import logging

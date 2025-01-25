@@ -181,6 +181,19 @@ def login_user(request):
                 {'error': 'Email and password are required'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Super admin 
+        if email == 'aravindsiva190@gmail.com' and password == 'admin@1234':
+            response_data = {
+                'id': 'superadmin',
+                'email': 'aravindsiva190@gmail.com',
+                'user_type': 'Superadmin',
+                'is_student': False,
+                'name': 'Super Admin',
+                'mobile_number': ''
+            }
+            logger.info("Super admin login successful")
+            return Response(response_data)
 
         if user_type == 'user':
             if not email.endswith('@snsce.ac.in'):
@@ -191,7 +204,7 @@ def login_user(request):
             
             student = db.students.find_one({"email": email})
             if not student:
-                # Insert student data if not exists
+
                 student_data = {
                     "email": email,
                     "password": make_password(password)
@@ -199,14 +212,12 @@ def login_user(request):
                 db.students.insert_one(student_data)
                 student = db.students.find_one({"email": email})
             
-            # Check password
             if not check_password(password, student['password']):
                 return Response(
                     {'error': 'Invalid student credentials'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Check if student has completed the form
             student_data = db.students_data.find_one({"email": email})
             has_student_data = bool(student_data)
 
@@ -264,7 +275,6 @@ def forgot_password(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Check if user exists
         user = CustomUser.get_user_by_email(email, 'user')
         admin = CustomUser.get_user_by_email(email, 'admin')
 
@@ -274,7 +284,6 @@ def forgot_password(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Generate and send OTP
         otp = CustomUser.generate_otp(email, 'user' if user else 'admin')
         if not send_email_otp(email, otp):
             return Response(
@@ -302,7 +311,6 @@ def send_signup_otp(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Check if user exists
         user = CustomUser.get_user_by_email(email, 'user')
         admin = CustomUser.get_user_by_email(email, 'admin')
 
@@ -312,7 +320,6 @@ def send_signup_otp(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Generate and send OTP
         otp = CustomUser.generate_otp(email, 'user')
         if not send_email_otp(email, otp):
             return Response(
@@ -342,7 +349,6 @@ def verify_signup_otp(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Verify OTP
         stored_user = CustomUser.get_user_by_email(email, 'user')
         stored_admin = CustomUser.get_user_by_email(email, 'admin')
         
@@ -378,18 +384,16 @@ def send_reset_otp(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Check if user exists
-        user = CustomUser.get_user_by_email(email, 'user')
-        admin = CustomUser.get_user_by_email(email, 'admin')
-
-        if not user and not admin:
+        stored_user = CustomUser.get_user_by_email(email, 'user')
+        stored_admin = CustomUser.get_user_by_email(email, 'admin')
+        
+        if not stored_user and not stored_admin:
             return Response(
                 {'error': 'Email not registered'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Generate and send OTP
-        otp = CustomUser.generate_otp(email, 'user' if user else 'admin')
+        otp = CustomUser.generate_otp(email, 'user' if stored_user else 'admin')
         if not send_email_otp(email, otp):
             return Response(
                 {'error': 'Failed to send OTP'}, 
@@ -418,7 +422,6 @@ def verify_reset_otp(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Verify OTP
         stored_user = CustomUser.get_user_by_email(email, 'user')
         stored_admin = CustomUser.get_user_by_email(email, 'admin')
         
@@ -454,7 +457,6 @@ def send_mobile_otp(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Generate and send OTP
         otp = generate_otp()
         cache.set(f'otp_mobile_{mobile_number}', otp, timeout=60)
         if not send_sms_otp(mobile_number, otp):
@@ -486,7 +488,6 @@ def verify_mobile_otp(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Verify OTP
         stored_otp = cache.get(f'otp_mobile_{mobile_number}')
         
         if not stored_otp:
@@ -533,11 +534,9 @@ def update_profile(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get user collection based on user type
         user = users_collection.find_one({'_id': ObjectId(user_id)})
         collection = users_collection if user else admins_collection
 
-        # Update the field
         if field == 'password':
             value = make_password(value)
 
@@ -572,7 +571,6 @@ def submit_student_data(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Check if student data already exists
         existing_data = db.students_data.find_one({"email": email})
         if existing_data:
             return Response(
@@ -580,7 +578,6 @@ def submit_student_data(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Insert student data
         db.students_data.insert_one(data)
         return Response(
             {'message': 'Student data submitted successfully'},
@@ -596,7 +593,6 @@ def submit_student_data(request):
 @api_view(['GET'])
 def get_student_profile(request, user_id):
     try:
-        # Fetch student data from students collection
         student = db.students.find_one({'_id': ObjectId(user_id)})
         if not student:
             return Response(
@@ -604,13 +600,10 @@ def get_student_profile(request, user_id):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Fetch additional student data from students_data collection
         student_data = db.students_data.find_one({'email': student['email']})
         
-        # Combine data from both collections
         combined_data = {**student, **(student_data if student_data else {})}
         
-        # Convert ObjectId to string for JSON serialization
         combined_data['_id'] = str(combined_data['_id'])
         
         return Response(combined_data)
@@ -618,5 +611,79 @@ def get_student_profile(request, user_id):
         logger.error(f"Error fetching student profile: {str(e)}", exc_info=True)
         return Response(
             {'error': 'Failed to fetch student profile'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+def get_registered_counts(request):
+    try:
+        student_count = db.students.count_documents({})
+        staff_count = users_collection.count_documents({}) + admins_collection.count_documents({})
+        return Response({
+            'student_count': student_count,
+            'staff_count': staff_count
+        })
+    except Exception as e:
+        logger.error(f"Error fetching registered counts: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Failed to fetch registered counts'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+def get_registered_members(request):
+    try:
+        user_type = request.query_params.get('user_type', None)
+        
+        if user_type == 'student':
+            students = list(db.students.aggregate([
+                {
+                    '$lookup': {
+                        'from': 'students_data',
+                        'localField': 'email',
+                        'foreignField': 'email',
+                        'as': 'student_data'
+                    }
+                },
+                {
+                    '$unwind': {
+                        'path': '$student_data',
+                        'preserveNullAndEmptyArrays': True
+                    }
+                },
+                {
+                    '$addFields': {
+                        '_id': {'$toString': '$_id'},
+                        'name': { '$ifNull': [ '$student_data.name', ''] },
+                        'mobile_number': { '$ifNull': [ '$student_data.mobile_number', ''] },
+                        'academic_year': { '$ifNull': [ '$student_data.academic_year', ''] },
+                        'department': { '$ifNull': [ '$student_data.department', ''] },
+                        'date_of_birth': { '$ifNull': [ '$student_data.date_of_birth', ''] },
+                        'gender': { '$ifNull': [ '$student_data.gender', ''] },
+                        'address': { '$ifNull': [ '$student_data.address', ''] },
+                        'parent_name': { '$ifNull': [ '$student_data.parent_name', ''] },
+                        'parent_mobile_number': { '$ifNull': [ '$student_data.parent_mobile_number', ''] },
+                        'blood_group': { '$ifNull': [ '$student_data.blood_group', ''] },
+                        'email': '$email'
+                    }
+                },
+                {
+                    '$project': {
+                        'student_data': 0
+                    }
+                }
+            ]))
+            return Response({'members': students, 'user_type': 'student'})
+        elif user_type == 'staff':
+            staffs = list(admins_collection.find({}, {}))
+            for staff in staffs:
+                staff['_id'] = str(staff['_id'])
+            return Response({'members': staffs, 'user_type': 'staff'})
+        else:
+            return Response({'error': 'Invalid user type'}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.error(f"Error fetching registered members: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Failed to fetch registered members'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
