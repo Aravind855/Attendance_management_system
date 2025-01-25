@@ -44,6 +44,12 @@ const Login = () => {
         user_type: userType
       });
       
+      if (response.data.user_type === 'Superadmin') {
+        localStorage.setItem('userInfo', JSON.stringify(response.data));
+        navigate('/superadmin-home');
+        return;
+      }
+      
       if (userType === 'user' && !response.data.is_student) {
         setError('This email is not registered as a student');
         return;
@@ -84,6 +90,8 @@ const Login = () => {
         <Tabs value={userType} onChange={handleTabChange} sx={{ mb: 3 }}>
           <Tab label="Student Login" value="user" />
           <Tab label="Staff Login" value="admin" />
+          <Tab label="Admin Login" value="Superadmin" />
+          
         </Tabs>
 
         {error && (

@@ -11,11 +11,12 @@ import Profile from './components/Profile';
 import { AppBar, Toolbar, Button, Container, Box } from '@mui/material';
 import ErrorBoundary from './components/ErrorBoundary';
 import StudentForm from './components/StudentForm';
+import SuperAdminHome from './components/SuperAdminHome';
 
 function App() {
   // Get current path
   const path = window.location.pathname;
-  const showNavBar = !['/user-home', '/admin-home', '/profile'].includes(path);
+  const showNavBar = !['/user-home', '/admin-home', '/profile', '/superadmin-home'].includes(path);
 
   return (
     <ErrorBoundary>
@@ -46,6 +47,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/profile" element={<Profile />} />
               <Route path='/StudentForm' element={<StudentForm/>} />
+              <Route path='/superadmin-home' element={<SuperAdminHome/>} />
             </Routes>
           </Container>
         </Box>

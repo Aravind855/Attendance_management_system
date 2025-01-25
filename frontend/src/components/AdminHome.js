@@ -46,7 +46,7 @@ const AdminHome = () => {
         </Paper>
 
         <Grid container spacing={3}>
-          {/* Admin Statistics */}
+          {}
           <Grid item xs={12} md={4}>
             <Paper sx={{ p: 3, textAlign: 'center' }}>
               <Typography variant="h6">Total Students</Typography>

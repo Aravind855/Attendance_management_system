@@ -34,4 +34,6 @@ urlpatterns = [
     path('api/update-profile/', views.update_profile, name='update_profile'),
     path('api/student-data/', views.submit_student_data, name='submit_student_data'),
     path('api/get-student-profile/<str:user_id>/', views.get_student_profile, name='get_student_profile'),
+    path('api/get-registered-counts/', views.get_registered_counts, name='get_registered_counts'),
+    path('api/get-registered-members/', views.get_registered_members, name='get_registered_members'),
 ]
