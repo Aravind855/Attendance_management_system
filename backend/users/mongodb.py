@@ -19,9 +19,9 @@ try:
     logger.info("Successfully connected to MongoDB Atlas!")
     
 
-    db = client["login_system"]
-    users_collection = db["users"]
-    admins_collection = db["admins"]
+    db = client["Attendance_management_system"]
+    users_collection = db["students"]
+    admins_collection = db["staffs"]
 
     #
     users_collection.create_index("email", unique=True)

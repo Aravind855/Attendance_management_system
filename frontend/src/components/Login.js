@@ -37,8 +37,8 @@ const Login = () => {
         </Typography>
         
         <Tabs value={userType} onChange={handleTabChange} sx={{ mb: 3 }}>
-          <Tab label="User Login" value="user" />
-          <Tab label="Admin Login" value="admin" />
+          <Tab label="Student Login" value="user" />
+          <Tab label="Staff Login" value="admin" />
         </Tabs>
 
         {error && (
@@ -63,6 +63,11 @@ const Login = () => {
                 user_type: userType
               });
               
+              if (userType === 'user' && !response.data.is_student) {
+                setError('This email is not registered as a student');
+                return;
+              }
+              
               localStorage.setItem('userInfo', JSON.stringify(response.data));
               
               if (response.data.user_type === 'admin') {
@@ -71,7 +76,11 @@ const Login = () => {
                 navigate('/user-home');
               }
             } catch (error) {
-              setError(error.response?.data?.error || 'Login failed');
+              if (userType === 'user') {
+                setError('Invalid student credentials');
+              } else {
+                setError(error.response?.data?.error || 'Login failed');
+              }
             }
             setSubmitting(false);
           }}
@@ -115,11 +124,13 @@ const Login = () => {
                 Login
               </Button>
 
-              <Box sx={{ textAlign: 'center' }}>
-                <MuiLink component={RouterLink} to="/signup" variant="body2">
-                  Don't have an account? Sign Up
-                </MuiLink>
-              </Box>
+              {userType === 'admin' && (
+                <Box sx={{ textAlign: 'center' }}>
+                  <MuiLink component={RouterLink} to="/signup" variant="body2">
+                    Don't have an account? Sign Up
+                  </MuiLink>
+                </Box>
+              )}
             </Form>
           )}
         </Formik>

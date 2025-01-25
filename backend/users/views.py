@@ -17,7 +17,7 @@ import json
 from bson import ObjectId
 from django.contrib.auth.hashers import make_password
 
-# Set up logging
+
 logger = logging.getLogger(__name__)
 
 def send_email_otp(email, otp):
@@ -36,10 +36,7 @@ def send_email_otp(email, otp):
         return False
 
 def send_sms_otp(phone, otp):
-    """Send OTP via SMS"""
     try:
-        # Implement your SMS sending logic here
-        # For now, we'll just log it
         logger.info(f"SMS OTP {otp} would be sent to {phone}")
         return True
     except Exception as e:
@@ -51,7 +48,6 @@ def generate_otp():
 
 def send_otp_email(subject, message, to_email):
     try:
-        # Create a new connection for each email
         connection = get_connection(
             backend='django.core.mail.backends.smtp.EmailBackend',
             host=settings.EMAIL_HOST,
@@ -61,7 +57,6 @@ def send_otp_email(subject, message, to_email):
             use_tls=settings.EMAIL_USE_TLS
         )
 
-        # Send email
         sent = send_mail(
             subject,
             message,
@@ -96,10 +91,8 @@ def send_otp(request):
                 return JsonResponse({'error': f'Missing {type}'}, status=400)
             
             otp = generate_otp()
-            # Store OTP in cache with 1-minute expiration
             cache.set(f'otp_{type}_{identifier}', otp, timeout=60)
             
-            # Send OTP via email or SMS based on type
             if type == 'email':
                 if not send_email_otp(identifier, otp):
                     return JsonResponse({'error': 'Failed to send email OTP'}, status=500)
@@ -132,7 +125,6 @@ def verify_otp(request):
             if stored_otp != user_otp:
                 return JsonResponse({'error': 'Invalid OTP'}, status=400)
                 
-            # Clear the OTP after successful verification
             cache.delete(f'otp_{type}_{identifier}')
             
             return JsonResponse({'message': 'OTP verified successfully'})
@@ -152,7 +144,6 @@ def register_user(request):
         
         logger.info("Processing registration for user_type: %s", user_type)
         
-        # Validate required fields
         if not all([name, email, mobile_number, password]):
             missing = [field for field in ['name', 'email', 'mobile_number', 'password'] 
                       if not request.data.get(field)]
@@ -161,7 +152,6 @@ def register_user(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Check if email already exists
         existing_user = CustomUser.get_user_by_email(email, 'user')
         existing_admin = CustomUser.get_user_by_email(email, 'admin')
         
@@ -171,7 +161,6 @@ def register_user(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Create user/admin
         result = CustomUser.create_user(name, email, mobile_number, password, user_type)
         logger.info("User created with ID: %s", result.inserted_id)
         
@@ -204,8 +193,36 @@ def login_user(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # For student login, check in students collection
+        if user_type == 'user':
+            student = db.students.find_one({"email": email})
+            if not student:
+                return Response(
+                    {'error': 'Invalid student credentials'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Direct password comparison for students since it's stored as plain text
+            if password == student['password']:
+                response_data = {
+                    'id': str(student['_id']),
+                    'email': student['email'],
+                    'user_type': 'user',
+                    'is_student': True,
+                    'name': student.get('name', ''),  # Add default value if name doesn't exist
+                    'mobile_number': student.get('mobile_number', '')
+                }
+                logger.info("Student login successful for: %s", email)
+                return Response(response_data)
+            
+            return Response(
+                {'error': 'Invalid student credentials'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # For staff login, use existing admin logic
         user = CustomUser.get_user_by_email(email, user_type)
-        logger.info("Found user: %s", bool(user))
+        logger.info("Found staff user: %s", bool(user))
         
         if not user:
             return Response(
@@ -213,16 +230,16 @@ def login_user(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Verify password using Django's check_password
         if check_password(password, user['password']):
             response_data = {
                 'id': str(user['_id']),
                 'name': user['name'],
                 'email': user['email'],
                 'user_type': user_type,
+                'is_student': False,
                 'mobile_number': user.get('mobile_number', '')
             }
-            logger.info("Login successful for user: %s", email)
+            logger.info("Staff login successful for user: %s", email)
             return Response(response_data)
         
         logger.warning("Invalid password for user: %s", email)
@@ -250,7 +267,6 @@ def forgot_password(request):
     
     otp = CustomUser.generate_otp(email)
     
-    # Send OTP via email
     send_mail(
         'Password Reset OTP',
         f'Your OTP for password reset is: {otp}',
@@ -263,7 +279,6 @@ def forgot_password(request):
 @api_view(['GET'])
 def test_db(request):
     try:
-        # Test both collections
         users_count = users_collection.count_documents({})
         admins_count = admins_collection.count_documents({})
         
@@ -304,7 +319,6 @@ def send_signup_otp(request):
         if settings.DEBUG:
             print(f"Generated OTP for {email}: {otp}")
 
-        # Store OTP temporarily
         temp_otps_collection = db["temp_otps"]
         temp_otps_collection.update_one(
             {
@@ -321,7 +335,6 @@ def send_signup_otp(request):
             upsert=True
         )
 
-        # Send OTP via email
         send_mail(
             f'{verification_type.capitalize()} Verification OTP',
             f'Your OTP for {verification_type} verification is: {otp}',
@@ -355,7 +368,6 @@ def verify_signup_otp(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get stored OTP from temporary collection
         temp_otps_collection = db["temp_otps"]
         stored_data = temp_otps_collection.find_one({
             "email": email,

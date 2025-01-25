@@ -57,7 +57,6 @@ const ResendButton = styled(Button)({
 const Signup = () => {
   const navigate = useNavigate();
   const [error, setError] = useState('');
-  const [userType, setUserType] = useState('user');
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [isMobileVerified, setIsMobileVerified] = useState(false);
   const [verificationError, setVerificationError] = useState('');
@@ -69,11 +68,6 @@ const Signup = () => {
     message: '',
     severity: 'success'
   });
-
-  const handleTabChange = (event, newValue) => {
-    setUserType(newValue);
-    setError('');
-  };
 
   const handleCloseSnackbar = () => {
     setSnackbar(prev => ({ ...prev, open: false }));
@@ -94,13 +88,8 @@ const Signup = () => {
 
       <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Typography component="h1" variant="h5">
-          Sign Up
+          Staff Sign Up
         </Typography>
-
-        <Tabs value={userType} onChange={handleTabChange} sx={{ mb: 3 }}>
-          <Tab label="User Signup" value="user" />
-          <Tab label="Admin Signup" value="admin" />
-        </Tabs>
 
         {error && (
           <Box sx={{ mb: 2, width: '100%' }}>
@@ -142,11 +131,11 @@ const Signup = () => {
               await axios.post('/api/register/', {
                 ...values,
                 name: `${values.first_name} ${values.last_name}`,
-                user_type: userType
+                user_type: 'admin'
               });
               setSnackbar({
                 open: true,
-                message: `${userType === 'admin' ? 'Admin' : 'User'} registered successfully!`,
+                message: 'Staff registered successfully!',
                 severity: 'success'
               });
               navigate('/login');
@@ -280,13 +269,16 @@ const Signup = () => {
                 sx={{ mt: 3, mb: 2 }}
                 disabled={isSubmitting || !isEmailVerified || !isMobileVerified}
               >
-                {`Sign Up as ${userType === 'admin' ? 'Admin' : 'User'}`}
+                Sign Up
               </Button>
 
-              <Box sx={{ textAlign: 'center' }}>
-                <MuiLink component={RouterLink} to="/login" variant="body2">
-                  Already have an account? Login
-                </MuiLink>
+              <Box sx={{ mt: 3, textAlign: 'center' }}>
+                <Typography variant="body2">
+                  For student login, please{' '}
+                  <MuiLink component={RouterLink} to="/login">
+                    click here
+                  </MuiLink>
+                </Typography>
               </Box>
             </Form>
           )}
