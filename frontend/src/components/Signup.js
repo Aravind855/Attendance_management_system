@@ -19,6 +19,7 @@ import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
 import OTPVerification from './OTPVerification';
 
+
 const SignupSchema = Yup.object().shape({
   first_name: Yup.string().required('Required'),
   last_name: Yup.string().required('Required'),

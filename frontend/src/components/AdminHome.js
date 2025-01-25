@@ -12,6 +12,7 @@ const AdminHome = () => {
       navigate('/login');
       return;
     }
+    
     const user = JSON.parse(userInfo);
     if (user.user_type !== 'admin') {
       navigate('/login');

@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
+
 const ResetPasswordSchema = Yup.object().shape({
   new_password: Yup.string()
     .min(8, 'Password must be at least 8 characters')
