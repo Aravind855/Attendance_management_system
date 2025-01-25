@@ -64,62 +64,7 @@ const CardDescription = styled(Typography)({
   fontSize: '0.9rem',
 });
 
-const items = [
-  {
-    title: 'Communication',
-    description: 'Master effective communication techniques',
-    image: 'https://via.placeholder.com/400x200?text=Communication',
-    link: '/communication'
-  },
-  {
-    title: 'Self Introduction',
-    description: 'Learn to present yourself professionally',
-    image: 'https://via.placeholder.com/400x200?text=Self+Introduction',
-    link: '/self-intro'
-  },
-  {
-    title: 'Presentation Skills',
-    description: 'Develop impactful presentation abilities',
-    image: 'https://via.placeholder.com/400x200?text=Presentation',
-    link: '/presentation'
-  },
-  {
-    title: 'Resume Building',
-    description: 'Create compelling professional resumes',
-    image: 'https://via.placeholder.com/400x200?text=Resume',
-    link: '/resume'
-  },
-  {
-    title: 'Group Discussion',
-    description: 'Excel in group discussions and team activities',
-    image: 'https://via.placeholder.com/400x200?text=Group+Discussion',
-    link: '/gd'
-  },
-  {
-    title: 'BMC Pitching',
-    description: 'Presenting your business idea using the Business Model Canvas.',
-    image: 'https://via.placeholder.com/400x200?text=BMC+Pitching',
-    link: '/BMC_Pitching'
-  },
-  {
-    title: 'Networking',
-    description: 'Building connections to exchange ideas and opportunities.',
-    image: 'https://via.placeholder.com/400x200?text=Networking',
-    link: '/Networking'
-  },
-  {
-    title: 'Outfit',
-    description: ' Dressing professionally to make a strong impression.',
-    image: 'https://via.placeholder.com/400x200?text=Outfit',
-    link: '/outfit'
-  },
-  {
-    title: 'Interview',
-    description: 'Excel in group discussions and team activities',
-    image: 'https://via.placeholder.com/400x200?text=Interview',
-    link: '/Interview'
-  }
-];
+
 
 const UserHome = () => {
   const [user, setUser] = useState(null);
@@ -162,7 +107,7 @@ const UserHome = () => {
       <Header>
         <Box>
           <Typography variant="h4" sx={{ color: '#2c3e50', fontWeight: '600' }}>
-            AI Trainer
+            Attendance Dashboard
           </Typography>
           <Typography variant="h6" sx={{ color: '#666666', mt: 1 }}>
             Welcome, {firstName}!
@@ -199,17 +144,7 @@ const UserHome = () => {
         </Menu>
       </Header>
 
-      <GridContainer>
-        {items.map((item, index) => (
-          <Card key={index} onClick={() => navigate(item.link)}>
-            <CardImage src={item.image} alt={item.title} />
-            <CardContent>
-              <CardTitle>{item.title}</CardTitle>
-              <CardDescription>{item.description}</CardDescription>
-            </CardContent>
-          </Card>
-        ))}
-      </GridContainer>
+      
     </PageContainer>
   );
 };

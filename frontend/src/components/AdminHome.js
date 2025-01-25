@@ -34,7 +34,7 @@ const AdminHome = () => {
         <Paper sx={{ p: 3, mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h4" component="h1">
-              Admin Dashboard
+              Staff Dashboard
             </Typography>
             <Button variant="contained" color="error" onClick={handleLogout}>
               Logout
@@ -42,7 +42,7 @@ const AdminHome = () => {
           </Box>
           
           <Typography variant="h6" gutterBottom>
-            Welcome, Admin {admin.name}!
+            Welcome, {admin.name}!
           </Typography>
         </Paper>
 
@@ -50,15 +50,15 @@ const AdminHome = () => {
           {/* Admin Statistics */}
           <Grid item xs={12} md={4}>
             <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="h6">Total Users</Typography>
+              <Typography variant="h6">Total Students</Typography>
               <Typography variant="h4">0</Typography>
-              <Button variant="text" sx={{ mt: 2 }}>View All Users</Button>
+              <Button variant="text" sx={{ mt: 2 }}>View All Students</Button>
             </Paper>
           </Grid>
 
           <Grid item xs={12} md={4}>
             <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="h6">New Users Today</Typography>
+              <Typography variant="h6">New Students Today</Typography>
               <Typography variant="h4">0</Typography>
               <Button variant="text" sx={{ mt: 2 }}>View Details</Button>
             </Paper>
@@ -66,9 +66,9 @@ const AdminHome = () => {
 
           <Grid item xs={12} md={4}>
             <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="h6">Active Users</Typography>
+              <Typography variant="h6">Active Students</Typography>
               <Typography variant="h4">0</Typography>
-              <Button variant="text" sx={{ mt: 2 }}>View Active Users</Button>
+              <Button variant="text" sx={{ mt: 2 }}>View Active Students</Button>
             </Paper>
           </Grid>
         </Grid>
@@ -76,10 +76,10 @@ const AdminHome = () => {
         {/* Admin Actions */}
         <Paper sx={{ p: 3, mt: 3 }}>
           <Typography variant="h6" gutterBottom>
-            Admin Actions
+            Staff Actions
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-            <Button variant="contained" color="primary">Manage Users</Button>
+            <Button variant="contained" color="primary">Manage Students</Button>
             <Button variant="contained" color="secondary">System Settings</Button>
             <Button variant="contained">View Reports</Button>
           </Box>

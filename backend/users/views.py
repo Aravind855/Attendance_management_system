@@ -4,10 +4,9 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from django.contrib.auth.hashers import check_password
 from django.core.mail import send_mail, get_connection
-from django.core.mail.backends.smtp import EmailBackend
 from datetime import datetime, timedelta
 from django.conf import settings
-from .models import CustomUser
+from .models import CustomUser, Student
 from pymongo.errors import ConnectionFailure, OperationFailure
 from .mongodb import users_collection, admins_collection, db
 import logging
@@ -21,15 +20,8 @@ from django.contrib.auth.hashers import make_password
 logger = logging.getLogger(__name__)
 
 def send_email_otp(email, otp):
-    """Send OTP via email"""
     try:
-        send_mail(
-            'Verification OTP',
-            f'Your OTP is: {otp}',
-            settings.EMAIL_HOST_USER,
-            [email],
-            fail_silently=False,
-        )
+        send_mail('Verification OTP', f'Your OTP is: {otp}',settings.EMAIL_HOST_USER,[email],fail_silently=False,)
         return True
     except Exception as e:
         logger.error(f"Error sending email OTP: {str(e)}")
@@ -142,8 +134,6 @@ def register_user(request):
         password = request.data.get('password')
         user_type = request.data.get('user_type', 'user')
         
-        logger.info("Processing registration for user_type: %s", user_type)
-        
         if not all([name, email, mobile_number, password]):
             missing = [field for field in ['name', 'email', 'mobile_number', 'password'] 
                       if not request.data.get(field)]
@@ -182,77 +172,30 @@ def register_user(request):
 @api_view(['POST'])
 def login_user(request):
     try:
-        logger.info("Login request data: %s", request.data)
         email = request.data.get('email')
         password = request.data.get('password')
-        user_type = request.data.get('user_type', 'user')
         
         if not email or not password:
-            return Response(
-                {'error': 'Email and password are required'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # For student login, check in students collection
-        if user_type == 'user':
-            student = db.students.find_one({"email": email})
-            if not student:
-                return Response(
-                    {'error': 'Invalid student credentials'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Direct password comparison for students since it's stored as plain text
-            if password == student['password']:
-                response_data = {
-                    'id': str(student['_id']),
-                    'email': student['email'],
-                    'user_type': 'user',
-                    'is_student': True,
-                    'name': student.get('name', ''),  # Add default value if name doesn't exist
-                    'mobile_number': student.get('mobile_number', '')
-                }
-                logger.info("Student login successful for: %s", email)
-                return Response(response_data)
-            
-            return Response(
-                {'error': 'Invalid student credentials'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        logger.info(f"Login attempt with email: {email} and password: {password}")
 
-        # For staff login, use existing admin logic
-        user = CustomUser.get_user_by_email(email, user_type)
-        logger.info("Found staff user: %s", bool(user))
+        student = Student.objects.filter(user__email=email).first()  # Check if student exists
+
+        if student:
+            if check_password(password, student.user.password):  # Assuming you have a password field in User
+                # Check if all student details are filled
+                if all([student.name, student.registration_no, student.department, 
+                         student.mobile_number, student.gender, student.dob, 
+                         student.academic_year]):
+                    return Response({'message': 'Login successful', 'redirect': '/userhome'}, status=status.HTTP_200_OK)
+                else:
+                    return Response({'message': 'Incomplete student information', 'redirect': '/studentform'}, status=status.HTTP_200_OK)
         
-        if not user:
-            return Response(
-                {'error': 'Invalid credentials'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if check_password(password, user['password']):
-            response_data = {
-                'id': str(user['_id']),
-                'name': user['name'],
-                'email': user['email'],
-                'user_type': user_type,
-                'is_student': False,
-                'mobile_number': user.get('mobile_number', '')
-            }
-            logger.info("Staff login successful for user: %s", email)
-            return Response(response_data)
-        
-        logger.warning("Invalid password for user: %s", email)
-        return Response(
-            {'error': 'Invalid credentials'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.error("Login error: %s", str(e), exc_info=True)
-        return Response(
-            {'error': 'Login failed'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({'error': 'Login failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
 def forgot_password(request):
@@ -751,3 +694,36 @@ def update_profile(request):
             {'error': 'Failed to update profile'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['GET'])
+def check_student_info(request):
+    # Assuming you have a way to identify the student, e.g., from the request
+    student_id = request.user.id  # or however you identify the student
+
+    try:
+        student = Student.objects.get(id=student_id)
+        return Response({'exists': True}, status=status.HTTP_200_OK)
+    except Student.DoesNotExist:
+        return Response({'exists': False}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['POST'])
+def save_student_info(request):
+    try:
+        data = request.data
+        user = request.user  # Assuming the user is authenticated
+
+        # Create or update student information
+        student, created = Student.objects.get_or_create(user=user)
+        student.name = data.get('name')
+        student.registration_no = data.get('registration_no')
+        student.department = data.get('department')
+        student.mobile_number = data.get('mobile_number')
+        student.gender = data.get('gender')
+        student.dob = data.get('dob')
+        student.academic_year = data.get('academic_year')
+        student.save()
+
+        return Response({'message': 'Student information saved successfully'}, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error("Error saving student info: %s", str(e), exc_info=True)
+        return Response({'error': 'Failed to save student information'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

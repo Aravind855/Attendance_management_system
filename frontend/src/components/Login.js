@@ -29,6 +29,18 @@ const Login = () => {
     setError('');
   };
 
+  const handleLogin = async (email, password) => {
+    try {
+      const response = await axios.post('/api/login/', { email, password });
+      if (response.data.redirect) {
+        navigate(response.data.redirect); // Redirect based on the response
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setError('Invalid credentials'); // Set a generic error message
+    }
+  };
+
   return (
     <Container maxWidth="sm">
       <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -58,23 +70,7 @@ const Login = () => {
           onSubmit={async (values, { setSubmitting }) => {
             try {
               setError('');
-              const response = await axios.post('/api/login/', {
-                ...values,
-                user_type: userType
-              });
-              
-              if (userType === 'user' && !response.data.is_student) {
-                setError('This email is not registered as a student');
-                return;
-              }
-              
-              localStorage.setItem('userInfo', JSON.stringify(response.data));
-              
-              if (response.data.user_type === 'admin') {
-                navigate('/admin-home');
-              } else {
-                navigate('/user-home');
-              }
+              await handleLogin(values.email, values.password);
             } catch (error) {
               if (userType === 'user') {
                 setError('Invalid student credentials');

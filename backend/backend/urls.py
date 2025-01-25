@@ -35,4 +35,6 @@ urlpatterns = [
     path('api/verify-mobile-otp/', views.verify_mobile_otp, name='verify-mobile-otp'),
     path('api/test-email/', views.test_email, name='test-email'),
     path('api/update-profile/', views.update_profile, name='update-profile'),
+    path('api/student-info', views.check_student_info, name='check_student_info'),
+    path('api/save-student-info/', views.save_student_info, name='save-student-info'),
 ]
