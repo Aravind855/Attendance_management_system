@@ -6,7 +6,7 @@ from django.contrib.auth.hashers import check_password
 from django.core.mail import send_mail, get_connection
 from datetime import datetime, timedelta
 from django.conf import settings
-from .models import CustomUser, Student
+from .models import CustomUser
 from pymongo.errors import ConnectionFailure, OperationFailure
 from .mongodb import users_collection, admins_collection, db
 import logging
@@ -141,32 +141,32 @@ def register_user(request):
                 {'error': f'Missing required fields: {", ".join(missing)}'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        existing_user = CustomUser.get_user_by_email(email, 'user')
-        existing_admin = CustomUser.get_user_by_email(email, 'admin')
         
-        if existing_user or existing_admin:
+        if user_type == 'user' and not email.endswith('@snsce.ac.in'):
             return Response(
-                {'error': 'Email already registered'}, 
+                {'error': 'Please use a valid SNSCE email address'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        result = CustomUser.create_user(name, email, mobile_number, password, user_type)
-        logger.info("User created with ID: %s", result.inserted_id)
         
-        return Response(
-            {
-                'message': f'{user_type.capitalize()} registered successfully',
-                'user_type': user_type,
-                'id': str(result.inserted_id)
-            }, 
-            status=status.HTTP_201_CREATED
-        )
+        result = CustomUser.create_user(name, email, mobile_number, password, user_type)
+        
+        if result.inserted_id:
+            logger.info("User registered successfully: %s", email)
+            return Response(
+                {'message': 'User registered successfully', 'id': str(result.inserted_id)},
+                status=status.HTTP_201_CREATED
+            )
+        else:
+            logger.error("User registration failed: %s", email)
+            return Response(
+                {'error': 'User registration failed'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     except Exception as e:
-        logger.error("Registration error: %s", str(e), exc_info=True)
+        logger.error(f"Error in register_user: {str(e)}", exc_info=True)
         return Response(
-            {'error': str(e)}, 
-            status=status.HTTP_400_BAD_REQUEST
+            {'error': 'Internal server error'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 @api_view(['POST'])
@@ -174,124 +174,157 @@ def login_user(request):
     try:
         email = request.data.get('email')
         password = request.data.get('password')
+        user_type = request.data.get('user_type', 'user')
         
         if not email or not password:
-            return Response({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Email and password are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        logger.info(f"Login attempt with email: {email} and password: {password}")
+        if user_type == 'user':
+            if not email.endswith('@snsce.ac.in'):
+                return Response(
+                    {'error': 'Please use a valid SNSCE email address'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            student = db.students.find_one({"email": email})
+            if not student:
+                # Insert student data if not exists
+                student_data = {
+                    "email": email,
+                    "password": make_password(password)
+                }
+                db.students.insert_one(student_data)
+                student = db.students.find_one({"email": email})
+            
+            # Check password
+            if not check_password(password, student['password']):
+                return Response(
+                    {'error': 'Invalid student credentials'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if student has completed the form
+            student_data = db.students_data.find_one({"email": email})
+            has_student_data = bool(student_data)
 
-        student = Student.objects.filter(user__email=email).first()  # Check if student exists
-
-        if student:
-            if check_password(password, student.user.password):  # Assuming you have a password field in User
-                # Check if all student details are filled
-                if all([student.name, student.registration_no, student.department, 
-                         student.mobile_number, student.gender, student.dob, 
-                         student.academic_year]):
-                    return Response({'message': 'Login successful', 'redirect': '/userhome'}, status=status.HTTP_200_OK)
-                else:
-                    return Response({'message': 'Incomplete student information', 'redirect': '/studentform'}, status=status.HTTP_200_OK)
+            response_data = {
+                'id': str(student['_id']),
+                'email': student['email'],
+                'user_type': 'user',
+                'is_student': True,
+                'name': student.get('name', ''),  # Add default value if name doesn't exist
+                'mobile_number': student.get('mobile_number', ''),
+                'has_student_data': has_student_data
+            }
+            logger.info("Student login successful for: %s", email)
+            return Response(response_data)
         
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        user = CustomUser.get_user_by_email(email, user_type)
+        
+        if not user:
+            return Response(
+                {'error': 'Invalid credentials'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if check_password(password, user['password']):
+            response_data = {
+                'id': str(user['_id']),
+                'name': user['name'],
+                'email': user['email'],
+                'user_type': user_type,
+                'is_student': False,
+                'mobile_number': user.get('mobile_number', '')
+            }
+            logger.info("Staff login successful for user: %s", email)
+            return Response(response_data)
+        
+        logger.warning("Invalid password for user: %s", email)
+        return Response(
+            {'error': 'Invalid credentials'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
     except Exception as e:
         logger.error("Login error: %s", str(e), exc_info=True)
-        return Response({'error': 'Login failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {'error': 'Login failed'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(['POST'])
 def forgot_password(request):
-    email = request.data.get('email')
-    user = CustomUser.get_user_by_email(email)
-    
-    if not user:
-        return Response(
-            {'error': 'Email not found'}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
-    
-    otp = CustomUser.generate_otp(email)
-    
-    send_mail(
-        'Password Reset OTP',
-        f'Your OTP for password reset is: {otp}',
-        settings.EMAIL_HOST_USER,
-        [email],
-        fail_silently=False,
-    )
-    return Response({'message': 'OTP sent to your email'})
-
-@api_view(['GET'])
-def test_db(request):
     try:
-        users_count = users_collection.count_documents({})
-        admins_count = admins_collection.count_documents({})
+        email = request.data.get('email')
+        if not email:
+            return Response(
+                {'error': 'Email is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user exists
+        user = CustomUser.get_user_by_email(email, 'user')
+        admin = CustomUser.get_user_by_email(email, 'admin')
+
+        if not user and not admin:
+            return Response(
+                {'error': 'Email not registered'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Generate and send OTP
+        otp = CustomUser.generate_otp(email, 'user' if user else 'admin')
+        if not send_email_otp(email, otp):
+            return Response(
+                {'error': 'Failed to send OTP'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         
         return Response({
-            'status': 'success',
-            'message': 'MongoDB Atlas connection successful',
-            'users_count': users_count,
-            'admins_count': admins_count
+            'message': 'OTP sent successfully'
         })
-    except (ConnectionFailure, OperationFailure) as e:
-        logger.error(f"MongoDB connection error: {str(e)}")
-        return Response({
-            'status': 'error',
-            'message': 'Database connection failed'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        return Response({
-            'status': 'error',
-            'message': 'An unexpected error occurred'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.error(f"Error in forgot_password: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Failed to send OTP'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(['POST'])
 def send_signup_otp(request):
     try:
-        data = request.data
-        email = data.get('email')
-        verification_type = data.get('type')
-
-        if not email or not verification_type:
+        email = request.data.get('email')
+        if not email:
             return Response(
-                {'error': 'Email and type are required'}, 
+                {'error': 'Email is required'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Check if user exists
+        user = CustomUser.get_user_by_email(email, 'user')
+        admin = CustomUser.get_user_by_email(email, 'admin')
 
-        # Generate OTP
-        otp = str(random.randint(100000, 999999))
-        if settings.DEBUG:
-            print(f"Generated OTP for {email}: {otp}")
-
-        temp_otps_collection = db["temp_otps"]
-        temp_otps_collection.update_one(
-            {
-                "email": email,
-                "type": verification_type
-            },
-            {
-                "$set": {
-                    "otp": otp,
-                    "valid_until": datetime.now() + timedelta(minutes=1),
-                    "type": verification_type
-                }
-            },
-            upsert=True
-        )
-
-        send_mail(
-            f'{verification_type.capitalize()} Verification OTP',
-            f'Your OTP for {verification_type} verification is: {otp}',
-            settings.EMAIL_HOST_USER,
-            [email],
-            fail_silently=False,
-        )
-
+        if user or admin:
+            return Response(
+                {'error': 'Email already registered'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Generate and send OTP
+        otp = CustomUser.generate_otp(email, 'user')
+        if not send_email_otp(email, otp):
+            return Response(
+                {'error': 'Failed to send OTP'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
         return Response({
-            'message': f'OTP sent successfully to your {verification_type}'
+            'message': 'OTP sent successfully'
         })
-
     except Exception as e:
-        logger.error(f"Error sending signup OTP: {str(e)}", exc_info=True)
+        logger.error(f"Error in send_signup_otp: {str(e)}", exc_info=True)
         return Response(
             {'error': 'Failed to send OTP'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -300,52 +333,36 @@ def send_signup_otp(request):
 @api_view(['POST'])
 def verify_signup_otp(request):
     try:
-        data = request.data
-        email = data.get('email')
-        otp = data.get('otp')
-        verification_type = data.get('type')
-
-        if not all([email, otp, verification_type]):
+        email = request.data.get('email')
+        otp = request.data.get('otp')
+        
+        if not all([email, otp]):
             return Response(
-                {'error': 'Email, OTP and type are required'}, 
+                {'error': 'Email and OTP are required'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        temp_otps_collection = db["temp_otps"]
-        stored_data = temp_otps_collection.find_one({
-            "email": email,
-            "type": verification_type
-        })
-
-        if not stored_data:
-            return Response(
-                {'error': 'No OTP found for this email'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if stored_data['otp'] != otp:
+        
+        # Verify OTP
+        stored_user = CustomUser.get_user_by_email(email, 'user')
+        stored_admin = CustomUser.get_user_by_email(email, 'admin')
+        
+        if stored_user and stored_user.get('otp') == otp:
+            CustomUser.update_password(email, None, 'user')
+            return Response({
+                'message': 'OTP verified successfully'
+            })
+        elif stored_admin and stored_admin.get('otp') == otp:
+            CustomUser.update_password(email, None, 'admin')
+            return Response({
+                'message': 'OTP verified successfully'
+            })
+        else:
             return Response(
                 {'error': 'Invalid OTP'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        if stored_data['valid_until'] < datetime.now():
-            # Remove expired OTP
-            temp_otps_collection.delete_one({"email": email, "type": verification_type})
-            return Response(
-                {'error': 'OTP has expired'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Remove the used OTP
-        temp_otps_collection.delete_one({"email": email, "type": verification_type})
-
-        return Response({
-            'message': f'{verification_type.capitalize()} verified successfully'
-        })
-
     except Exception as e:
-        logger.error(f"Error verifying signup OTP: {str(e)}", exc_info=True)
+        logger.error(f"Error in verify_signup_otp: {str(e)}", exc_info=True)
         return Response(
             {'error': 'Failed to verify OTP'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -354,122 +371,74 @@ def verify_signup_otp(request):
 @api_view(['POST'])
 def send_reset_otp(request):
     try:
-        data = request.data
-        email = data.get('email')
-        verification_type = data.get('type')
-
-        if not email or not verification_type:
+        email = request.data.get('email')
+        if not email:
             return Response(
-                {'error': 'Email and type are required'}, 
+                {'error': 'Email is required'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
+        # Check if user exists
+        user = CustomUser.get_user_by_email(email, 'user')
+        admin = CustomUser.get_user_by_email(email, 'admin')
 
-        # Generate and store OTP
-        otp = str(random.randint(100000, 999999))
-        otp_valid_until = datetime.now() + timedelta(minutes=1)
-
-        # Store OTP first
-        temp_otps_collection = db["temp_otps"]
-        temp_otps_collection.update_one(
-            {
-                "email": email,
-                "type": verification_type
-            },
-            {
-                "$set": {
-                    "otp": otp,
-                    "valid_until": otp_valid_until,
-                    "type": verification_type
-                }
-            },
-            upsert=True
-        )
-
-        # Send email
-        email_sent = send_otp_email(
-            'Password Reset OTP',
-            f'Your OTP for password reset is: {otp}',
-            email
-        )
-
-        if not email_sent:
-            # If email fails, delete the stored OTP
-            temp_otps_collection.delete_one({
-                "email": email,
-                "type": verification_type
-            })
+        if not user and not admin:
             return Response(
-                {'error': 'Failed to send OTP email'}, 
+                {'error': 'Email not registered'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Generate and send OTP
+        otp = CustomUser.generate_otp(email, 'user' if user else 'admin')
+        if not send_email_otp(email, otp):
+            return Response(
+                {'error': 'Failed to send OTP'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
+        
         return Response({
-            'message': 'OTP sent successfully to your email'
+            'message': 'OTP sent successfully'
         })
-
     except Exception as e:
         logger.error(f"Error in send_reset_otp: {str(e)}", exc_info=True)
         return Response(
-            {'error': 'Failed to process request'}, 
+            {'error': 'Failed to send OTP'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 @api_view(['POST'])
 def verify_reset_otp(request):
     try:
-        data = request.data
-        email = data.get('email')
-        otp = data.get('otp')
-        verification_type = data.get('type')
-
-        if not all([email, otp, verification_type]):
+        email = request.data.get('email')
+        otp = request.data.get('otp')
+        
+        if not all([email, otp]):
             return Response(
-                {'error': 'Email, OTP and type are required'}, 
+                {'error': 'Email and OTP are required'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
+        
         # Verify OTP
-        temp_otps_collection = db["temp_otps"]
-        stored_data = temp_otps_collection.find_one({
-            "email": email,
-            "type": verification_type
-        })
-
-        if not stored_data:
-            return Response(
-                {'error': 'No OTP found for this email'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if stored_data['otp'] != otp:
+        stored_user = CustomUser.get_user_by_email(email, 'user')
+        stored_admin = CustomUser.get_user_by_email(email, 'admin')
+        
+        if stored_user and stored_user.get('otp') == otp:
+            CustomUser.update_password(email, None, 'user')
+            return Response({
+                'message': 'OTP verified successfully'
+            })
+        elif stored_admin and stored_admin.get('otp') == otp:
+            CustomUser.update_password(email, None, 'admin')
+            return Response({
+                'message': 'OTP verified successfully'
+            })
+        else:
             return Response(
                 {'error': 'Invalid OTP'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        if stored_data['valid_until'] < datetime.now():
-            # Remove expired OTP
-            temp_otps_collection.delete_one({
-                "email": email,
-                "type": verification_type
-            })
-            return Response(
-                {'error': 'OTP has expired'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Remove the used OTP
-        temp_otps_collection.delete_one({
-            "email": email,
-            "type": verification_type
-        })
-
-        return Response({
-            'message': 'OTP verified successfully'
-        })
-
     except Exception as e:
-        logger.error(f"Error verifying reset OTP: {str(e)}", exc_info=True)
+        logger.error(f"Error in verify_reset_otp: {str(e)}", exc_info=True)
         return Response(
             {'error': 'Failed to verify OTP'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -478,54 +447,27 @@ def verify_reset_otp(request):
 @api_view(['POST'])
 def send_mobile_otp(request):
     try:
-        data = request.data
-        mobile_number = data.get('mobile_number')
-        email = data.get('email')  # We'll use this to send OTP for testing
-        verification_type = data.get('type')
-
-        if not mobile_number or not email or not verification_type:
+        mobile_number = request.data.get('mobile_number')
+        if not mobile_number:
             return Response(
-                {'error': 'Mobile number, email and type are required'}, 
+                {'error': 'Mobile number is required'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        # Generate OTP
-        otp = str(random.randint(100000, 999999))
-        otp_valid_until = datetime.now() + timedelta(minutes=1)
-
-        # Store OTP temporarily with both mobile and email
-        temp_otps_collection = db["temp_otps"]
-        temp_otps_collection.update_one(
-            {
-                "mobile_number": mobile_number,
-                "email": email,
-                "type": verification_type
-            },
-            {
-                "$set": {
-                    "otp": otp,
-                    "valid_until": otp_valid_until,
-                    "type": verification_type
-                }
-            },
-            upsert=True
-        )
-
-        # For testing purposes, send OTP via email
-        send_mail(
-            'Mobile Number Verification',
-            f'Your OTP for mobile number verification is: {otp}',
-            settings.EMAIL_HOST_USER,
-            [email],
-            fail_silently=False,
-        )
-
+        
+        # Generate and send OTP
+        otp = generate_otp()
+        cache.set(f'otp_mobile_{mobile_number}', otp, timeout=60)
+        if not send_sms_otp(mobile_number, otp):
+            return Response(
+                {'error': 'Failed to send OTP'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
         return Response({
-            'message': 'OTP sent successfully to your email (for mobile verification)'
+            'message': 'OTP sent successfully'
         })
-
     except Exception as e:
-        logger.error(f"Error sending mobile OTP: {str(e)}", exc_info=True)
+        logger.error(f"Error in send_mobile_otp: {str(e)}", exc_info=True)
         return Response(
             {'error': 'Failed to send OTP'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -534,48 +476,34 @@ def send_mobile_otp(request):
 @api_view(['POST'])
 def verify_mobile_otp(request):
     try:
-        data = request.data
-        mobile_number = data.get('mobile_number')
-        otp = data.get('otp')
-        verification_type = data.get('type')
-
+        mobile_number = request.data.get('mobile_number')
+        otp = request.data.get('otp')
+        verification_type = request.data.get('type')
+        
         if not all([mobile_number, otp, verification_type]):
             return Response(
                 {'error': 'Mobile number, OTP and type are required'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        # Get stored OTP from temporary collection
-        temp_otps_collection = db["temp_otps"]
-        stored_data = temp_otps_collection.find_one({
-            "mobile_number": mobile_number,
-            "type": verification_type
-        })
-
-        if not stored_data:
+        
+        # Verify OTP
+        stored_otp = cache.get(f'otp_mobile_{mobile_number}')
+        
+        if not stored_otp:
             return Response(
-                {'error': 'No OTP found for this mobile number'}, 
+                {'error': 'OTP expired'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        if stored_data['otp'] != otp:
+        
+        if stored_otp != otp:
             return Response(
                 {'error': 'Invalid OTP'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        if stored_data['valid_until'] < datetime.now():
-            # Remove expired OTP
-            temp_otps_collection.delete_one({
-                "mobile_number": mobile_number,
-                "type": verification_type
-            })
-            return Response(
-                {'error': 'OTP has expired'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Remove the used OTP
+        
+        cache.delete(f'otp_mobile_{mobile_number}')
+        
+        temp_otps_collection = db["temp_otps"]
         temp_otps_collection.delete_one({
             "mobile_number": mobile_number,
             "type": verification_type
@@ -591,68 +519,6 @@ def verify_mobile_otp(request):
             {'error': 'Failed to verify OTP'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
-@api_view(['POST'])
-def reset_password(request):
-    try:
-        data = request.data
-        email = data.get('email')
-        new_password = data.get('new_password')
-
-        if not email or not new_password:
-            return Response(
-                {'error': 'Email and new password are required'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Check if user exists
-        user = CustomUser.get_user_by_email(email, 'user')
-        admin = CustomUser.get_user_by_email(email, 'admin')
-
-        if not user and not admin:
-            return Response(
-                {'error': 'Email not registered'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Update password in appropriate collection
-        if user:
-            CustomUser.update_password(email, new_password, 'user')
-        else:
-            CustomUser.update_password(email, new_password, 'admin')
-
-        # Clear any remaining OTPs for this email
-        temp_otps_collection = db["temp_otps"]
-        temp_otps_collection.delete_many({
-            "email": email,
-            "type": "reset"
-        })
-
-        return Response({
-            'message': 'Password reset successful'
-        })
-
-    except Exception as e:
-        logger.error(f"Error resetting password: {str(e)}", exc_info=True)
-        return Response(
-            {'error': 'Failed to reset password'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@api_view(['POST'])
-def test_email(request):
-    try:
-        send_mail(
-            'Test Email',
-            'This is a test email.',
-            settings.EMAIL_HOST_USER,
-            [settings.EMAIL_HOST_USER],  # Send to yourself
-            fail_silently=False,
-        )
-        return Response({'message': 'Test email sent successfully'})
-    except Exception as e:
-        logger.error(f"Email test error: {str(e)}")
-        return Response({'error': str(e)}, status=500)
 
 @api_view(['POST'])
 def update_profile(request):
@@ -695,35 +561,62 @@ def update_profile(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-@api_view(['GET'])
-def check_student_info(request):
-    # Assuming you have a way to identify the student, e.g., from the request
-    student_id = request.user.id  # or however you identify the student
-
-    try:
-        student = Student.objects.get(id=student_id)
-        return Response({'exists': True}, status=status.HTTP_200_OK)
-    except Student.DoesNotExist:
-        return Response({'exists': False}, status=status.HTTP_404_NOT_FOUND)
-
 @api_view(['POST'])
-def save_student_info(request):
+def submit_student_data(request):
     try:
         data = request.data
-        user = request.user  # Assuming the user is authenticated
-
-        # Create or update student information
-        student, created = Student.objects.get_or_create(user=user)
-        student.name = data.get('name')
-        student.registration_no = data.get('registration_no')
-        student.department = data.get('department')
-        student.mobile_number = data.get('mobile_number')
-        student.gender = data.get('gender')
-        student.dob = data.get('dob')
-        student.academic_year = data.get('academic_year')
-        student.save()
-
-        return Response({'message': 'Student information saved successfully'}, status=status.HTTP_200_OK)
+        email = data.get('email')
+        if not email:
+            return Response(
+                {'error': 'Email is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if student data already exists
+        existing_data = db.students_data.find_one({"email": email})
+        if existing_data:
+            return Response(
+                {'error': 'Student data already exists'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Insert student data
+        db.students_data.insert_one(data)
+        return Response(
+            {'message': 'Student data submitted successfully'},
+            status=status.HTTP_201_CREATED
+        )
     except Exception as e:
-        logger.error("Error saving student info: %s", str(e), exc_info=True)
-        return Response({'error': 'Failed to save student information'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.error(f"Error submitting student data: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Failed to submit student data'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['GET'])
+def get_student_profile(request, user_id):
+    try:
+        # Fetch student data from students collection
+        student = db.students.find_one({'_id': ObjectId(user_id)})
+        if not student:
+            return Response(
+                {'error': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Fetch additional student data from students_data collection
+        student_data = db.students_data.find_one({'email': student['email']})
+        
+        # Combine data from both collections
+        combined_data = {**student, **(student_data if student_data else {})}
+        
+        # Convert ObjectId to string for JSON serialization
+        combined_data['_id'] = str(combined_data['_id'])
+        
+        return Response(combined_data)
+    except Exception as e:
+        logger.error(f"Error fetching student profile: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Failed to fetch student profile'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

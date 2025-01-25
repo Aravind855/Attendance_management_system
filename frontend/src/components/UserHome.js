@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Container, Avatar, IconButton, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Box, Typography, Container, Avatar, IconButton, Menu, MenuItem, ListItemIcon, ListItemText, Paper, Grid, CircularProgress, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import PersonIcon from '@mui/icons-material/Person';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import axios from 'axios';
+import { Button } from '@mui/material';
 
 // Styled components
 const PageContainer = styled(Box)({
@@ -63,26 +65,30 @@ const CardDescription = styled(Typography)({
   fontSize: '0.9rem',
 });
 
-
-
 const UserHome = () => {
-  const [user, setUser] = useState(null);
+  const [studentData, setStudentData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [anchorEl, setAnchorEl] = useState(null);
   const navigate = useNavigate();
 
+  const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+  const userId = userInfo?.id;
+
   useEffect(() => {
-    const userInfo = localStorage.getItem('userInfo');
-    if (!userInfo) {
-      navigate('/login');
-      return;
-    }
-    const parsedUser = JSON.parse(userInfo);
-    if (parsedUser.user_type === 'admin') {
-      navigate('/admin-home');
-      return;
-    }
-    setUser(parsedUser);
-  }, [navigate]);
+    const fetchStudentData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:8000/api/get-student-profile/${userId}`);
+        setStudentData(response.data);
+        setLoading(false);
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to fetch student data');
+        setLoading(false);
+      }
+    };
+
+    fetchStudentData();
+  }, [userId]);
 
   const handleProfileClick = (event) => {
     setAnchorEl(event.currentTarget);
@@ -97,9 +103,17 @@ const UserHome = () => {
     navigate(path);
   };
 
-  if (!user) return null;
+  if (loading) {
+    return (
+      <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
 
-  const firstName = user.name.split(' ')[0];
+  if (error) {
+    return <Container><Alert severity="error">{error}</Alert></Container>;
+  }
 
   return (
     <PageContainer>
@@ -109,7 +123,7 @@ const UserHome = () => {
             Attendance Dashboard
           </Typography>
           <Typography variant="h6" sx={{ color: '#666666', mt: 1 }}>
-            Welcome, {firstName}!
+            Welcome, {studentData?.name}!
           </Typography>
         </Box>
         <IconButton onClick={handleProfileClick} size="large">
@@ -143,7 +157,70 @@ const UserHome = () => {
         </Menu>
       </Header>
 
-      
+      <Container maxWidth="md">
+        <Box sx={{ mt: 4, mb: 4 }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Welcome, {studentData?.name}!
+          </Typography>
+          <Paper elevation={3} sx={{ p: 3 }}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="h6" gutterBottom>
+                  Attendance Progress
+                </Typography>
+                <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+                  <CircularProgress variant="determinate" value={75} size={100} />
+                  <Box
+                    sx={{
+                      top: 0,
+                      left: 0,
+                      bottom: 0,
+                      right: 0,
+                      position: 'absolute',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Typography variant="h5" component="div" color="textSecondary">
+                      75%
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="h6" gutterBottom>
+                  Attendance Percentage
+                </Typography>
+                <Typography variant="h4" color="primary">
+                  85%
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="h6" gutterBottom>
+                  Number of Leaves Taken
+                </Typography>
+                <Typography variant="h4" color="secondary">
+                  3
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="h6" gutterBottom>
+                  Total Working Days
+                </Typography>
+                <Typography variant="h4" color="textSecondary">
+                  100
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center' }}>
+                <Button variant="contained" color="primary" onClick={() => handleMenuItemClick('/profile')}>
+                  View Profile
+                </Button>
+              </Grid>
+            </Grid>
+          </Paper>
+        </Box>
+      </Container>
     </PageContainer>
   );
 };
