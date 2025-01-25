@@ -27,7 +27,7 @@ const Profile = () => {
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [isMobileVerified, setIsMobileVerified] = useState(false);
   const navigate = useNavigate();
-
+ 
   useEffect(() => {
     const userInfo = localStorage.getItem('userInfo');
     if (!userInfo) {
