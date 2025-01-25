@@ -13,6 +13,7 @@ import {
   DialogActions,
   TextField,
   IconButton,
+  Alert,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
@@ -21,22 +22,36 @@ import axios from '../config/axios';
 import OTPVerification from './OTPVerification';
 
 const Profile = () => {
-  const [user, setUser] = useState(null);
+  const [studentData, setStudentData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [updateSuccess, setUpdateSuccess] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
+  const [password, setPassword] = useState('');
   const [editDialog, setEditDialog] = useState({ open: false, field: null });
   const [newValue, setNewValue] = useState('');
-  const [isEmailVerified, setIsEmailVerified] = useState(false);
-  const [isMobileVerified, setIsMobileVerified] = useState(false);
+  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
   const navigate = useNavigate();
- 
+
+  const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+  const userId = userInfo?.id;
+  const email = userInfo?.email;
+
   useEffect(() => {
-    const userInfo = localStorage.getItem('userInfo');
-    if (!userInfo) {
-      navigate('/login');
-      return;
-    }
-    const parsedUser = JSON.parse(userInfo);
-    setUser(parsedUser);
-  }, [navigate]);
+    const fetchStudentData = async () => {
+      try {
+        const response = await axios.get(`http://localhost:8000/api/get-student-profile/${userId}`);
+        setStudentData(response.data);
+        setMobileNumber(response.data.mobile_number || '');
+        setLoading(false);
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to fetch student data');
+        setLoading(false);
+      }
+    };
+
+    fetchStudentData();
+  }, [userId]);
 
   const handleBack = () => {
     navigate('/user-home');
@@ -50,8 +65,10 @@ const Profile = () => {
   const handleEdit = (field) => {
     setEditDialog({ open: true, field });
     setNewValue('');
-    setIsEmailVerified(false);
-    setIsMobileVerified(false);
+    setIsPasswordVerified(false);
+    if (field === 'password') {
+        setPassword('');
+    }
   };
 
   const handleClose = () => {
@@ -59,43 +76,69 @@ const Profile = () => {
     setNewValue('');
   };
 
-  const handleUpdate = async () => {
+  const handleUpdateProfile = async (field, value) => {
     try {
-      if (editDialog.field === 'email' && !isEmailVerified) {
-        alert('Please verify your new email first');
-        return;
-      }
-      if (editDialog.field === 'mobile_number' && !isMobileVerified) {
-        alert('Please verify your new mobile number first');
-        return;
-      }
-
-      const response = await axios.post('/api/update-profile/', {
-        user_id: user.id,
-        field: editDialog.field,
-        value: newValue
+      const response = await axios.post('http://localhost:8000/api/update-profile/', {
+        user_id: userId,
+        field: field,
+        value: value,
       });
-
       if (response.data.success) {
-        // Update local storage with new user data
-        const updatedUser = { ...user, [editDialog.field]: newValue };
-        localStorage.setItem('userInfo', JSON.stringify(updatedUser));
-        setUser(updatedUser);
-        handleClose();
+        setUpdateSuccess(`${field} updated successfully`);
+        // Update local state
+         if (field === 'mobile_number') {
+          setStudentData({...studentData, mobile_number: value});
+          setMobileNumber(value);
+        }
+        
+      } else {
+        setError(response.data.error || `Failed to update ${field}`);
       }
-    } catch (error) {
-      alert(error.response?.data?.error || 'Failed to update profile');
+    } catch (err) {
+      setError(err.response?.data?.error || `Failed to update ${field}`);
     }
   };
 
-  if (!user) return null;
+  const handlePasswordUpdate = async (newPassword) => {
+    if (!newPassword) {
+      setError('Password cannot be empty');
+      return;
+    }
+    if (!isPasswordVerified) {
+        setError('Please verify your new password first');
+        return;
+    }
+    try {
+      const response = await axios.post('http://localhost:8000/api/update-profile/', {
+        user_id: userId,
+        field: 'password',
+        value: newPassword,
+      });
+      if (response.data.success) {
+        setUpdateSuccess('Password updated successfully');
+        setPassword('');
+        setIsPasswordVerified(false);
+        handleClose();
+      } else {
+        setError(response.data.error || 'Failed to update password');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to update password');
+    }
+  };
 
-  const [firstName, lastName] = user.name.split(' ');
+  if (loading) {
+    return <Container><Typography>Loading profile...</Typography></Container>;
+  }
+
+  if (error) {
+    return <Container><Alert severity="error">{error}</Alert></Container>;
+  }
+
+  const [firstName, lastName] = studentData.name.split(' ');
 
   const renderEditDialog = () => {
     const isPassword = editDialog.field === 'password';
-    const isEmail = editDialog.field === 'email';
-    const isMobile = editDialog.field === 'mobile_number';
 
     return (
       <Dialog open={editDialog.open} onClose={handleClose}>
@@ -110,24 +153,17 @@ const Profile = () => {
             value={newValue}
             onChange={(e) => setNewValue(e.target.value)}
           />
-          {isEmail && newValue && (
+          {isPassword && newValue && (
             <OTPVerification
-              type="email"
-              identifier={newValue}
-              onVerify={(success) => setIsEmailVerified(success)}
-            />
-          )}
-          {isMobile && newValue && (
-            <OTPVerification
-              type="mobile"
-              identifier={newValue}
-              onVerify={(success) => setIsMobileVerified(success)}
+              type="reset"
+              identifier={email}
+              onVerify={(success) => setIsPasswordVerified(success)}
             />
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleUpdate}>Update</Button>
+          <Button onClick={() => handlePasswordUpdate(newValue)}>Update</Button>
         </DialogActions>
       </Dialog>
     );
@@ -146,9 +182,11 @@ const Profile = () => {
               <AccountCircleIcon sx={{ fontSize: 100 }} />
             </Avatar>
             <Typography variant="h4" gutterBottom>
-              Profile Details
+              Student Profile
             </Typography>
           </Box>
+
+          {updateSuccess && <Alert severity="success" sx={{ mb: 2 }}>{updateSuccess}</Alert>}
 
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
@@ -169,18 +207,60 @@ const Profile = () => {
               </Typography>
             </Grid>
 
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle1" color="textSecondary">
+                Registration Number
+              </Typography>
+              <Typography variant="h6" gutterBottom>
+                {studentData.registration_no}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle1" color="textSecondary">
+                Department
+              </Typography>
+              <Typography variant="h6" gutterBottom>
+                {studentData.department}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle1" color="textSecondary">
+                Gender
+              </Typography>
+              <Typography variant="h6" gutterBottom>
+                {studentData.gender}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle1" color="textSecondary">
+                Date of Birth
+              </Typography>
+              <Typography variant="h6" gutterBottom>
+                {studentData.dob}
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Typography variant="subtitle1" color="textSecondary">
+                Academic Year
+              </Typography>
+              <Typography variant="h6" gutterBottom>
+                {studentData.academic_year}
+              </Typography>
+            </Grid>
+
             <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center' }}>
               <Box sx={{ flexGrow: 1 }}>
                 <Typography variant="subtitle1" color="textSecondary">
                   Email
                 </Typography>
                 <Typography variant="h6" gutterBottom>
-                  {user.email}
+                  {email}
                 </Typography>
               </Box>
-              <IconButton onClick={() => handleEdit('email')}>
-                <EditIcon />
-              </IconButton>
             </Grid>
 
             <Grid item xs={12} sx={{ display: 'flex', alignItems: 'center' }}>
@@ -189,7 +269,7 @@ const Profile = () => {
                   Mobile Number
                 </Typography>
                 <Typography variant="h6" gutterBottom>
-                  {user.mobile_number}
+                  {mobileNumber}
                 </Typography>
               </Box>
               <IconButton onClick={() => handleEdit('mobile_number')}>
@@ -209,15 +289,6 @@ const Profile = () => {
               <IconButton onClick={() => handleEdit('password')}>
                 <EditIcon />
               </IconButton>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="subtitle1" color="textSecondary">
-                Account Type
-              </Typography>
-              <Typography variant="h6" gutterBottom sx={{ textTransform: 'capitalize' }}>
-                {user.user_type}
-              </Typography>
             </Grid>
           </Grid>
 

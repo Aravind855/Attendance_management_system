@@ -11,6 +11,7 @@ import {
   Link as MuiLink,
   Tabs,
   Tab,
+  Alert,
 } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
@@ -29,16 +30,48 @@ const Login = () => {
     setError('');
   };
 
-  const handleLogin = async (email, password) => {
-    try {
-      const response = await axios.post('/api/login/', { email, password });
-      if (response.data.redirect) {
-        navigate(response.data.redirect); // Redirect based on the response
-      }
-    } catch (error) {
-      console.error("Login error:", error);
-      setError('Invalid credentials'); // Set a generic error message
+  const handleSubmit = async (values, { setSubmitting }) => {
+    setError('');
+    if (userType === 'user' && !values.email.endsWith('@snsce.ac.in')) {
+      setError('Please use a valid SNSCE email address.');
+      setSubmitting(false);
+      return;
     }
+    try {
+      const response = await axios.post('/api/login/', {
+        email: values.email,
+        password: values.password,
+        user_type: userType
+      });
+      
+      if (userType === 'user' && !response.data.is_student) {
+        setError('This email is not registered as a student');
+        return;
+      }
+      
+      localStorage.setItem('userInfo', JSON.stringify(response.data));
+      
+      if (response.data.user_type === 'admin') {
+        navigate('/admin-home');
+      } else {
+        if (response.data.is_student) {
+          if (response.data.has_student_data) {
+            navigate('/user-home');
+          } else {
+            navigate('/StudentForm');
+          }
+        } else {
+          navigate('/user-home');
+        }
+      }
+    } catch (err) {
+      if (userType === 'user') {
+        setError('Invalid student credentials');
+      } else {
+        setError(err.response?.data?.error || 'Login failed');
+      }
+    }
+    setSubmitting(false);
   };
 
   return (
@@ -55,9 +88,7 @@ const Login = () => {
 
         {error && (
           <Box sx={{ mb: 2, width: '100%' }}>
-            <Typography color="error" align="center">
-              {error}
-            </Typography>
+            <Alert severity="error">{error}</Alert>
           </Box>
         )}
 
@@ -67,19 +98,7 @@ const Login = () => {
             password: '',
           }}
           validationSchema={LoginSchema}
-          onSubmit={async (values, { setSubmitting }) => {
-            try {
-              setError('');
-              await handleLogin(values.email, values.password);
-            } catch (error) {
-              if (userType === 'user') {
-                setError('Invalid student credentials');
-              } else {
-                setError(error.response?.data?.error || 'Login failed');
-              }
-            }
-            setSubmitting(false);
-          }}
+          onSubmit={handleSubmit}
         >
           
           {({ errors, touched, isSubmitting }) => (

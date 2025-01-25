@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { Formik, Form, Field } from "formik";
 import * as Yup from "yup";
 import {
@@ -9,8 +9,8 @@ import {
   Box,
   MenuItem,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const StudentFormSchema = Yup.object().shape({
   name: Yup.string().required("Required"),
@@ -25,33 +25,9 @@ const StudentFormSchema = Yup.object().shape({
 });
 
 const StudentForm = () => {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const checkStudentInfo = async () => {
-      try {
-        const response = await axios.get('/api/student-info');
-        if (response.data.exists) {
-          navigate('/userdashboard');
-        }
-      } catch (error) {
-        console.error("Error checking student info:", error);
-      }
-    };
-
-    checkStudentInfo();
-  }, [navigate]);
-
-  const handleSubmit = async (values, { setSubmitting }) => {
-    try {
-      await axios.post('/api/save-student-info/', values);
-      navigate('/userhome');
-    } catch (error) {
-      console.error("Error saving student info:", error);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    const navigate = useNavigate();
+    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+    const email = userInfo?.email;
 
   return (
     <Container maxWidth="sm">
@@ -78,7 +54,23 @@ const StudentForm = () => {
             academic_year: "",
           }}
           validationSchema={StudentFormSchema}
-          onSubmit={handleSubmit}
+          onSubmit={async (values, { setSubmitting }) => {
+            try {
+                const response = await axios.post('http://localhost:8000/api/student-data/', { ...values, email: email }, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (response.status === 201) {
+                    navigate('/user-home');
+                } else {
+                    console.error("Failed to submit student data");
+                }
+            } catch (error) {
+                console.error("Error submitting student data:", error);
+            }
+            setSubmitting(false);
+          }}
         >
           {({ errors, touched, isSubmitting }) => (
             <Form>
@@ -113,10 +105,15 @@ const StudentForm = () => {
                 helperText={touched.department && errors.department}
               >
                 <MenuItem value="CSE">CSE</MenuItem>
+                <MenuItem value="AD">AD</MenuItem>
+                <MenuItem value="IT">IT</MenuItem>
+                <MenuItem value="CSD">CSD</MenuItem>
+                <MenuItem value="CST">CST</MenuItem>
+                <MenuItem value="IOT">IOT</MenuItem>
                 <MenuItem value="ECE">ECE</MenuItem>
                 <MenuItem value="EEE">EEE</MenuItem>
                 <MenuItem value="MECH">MECH</MenuItem>
-                <MenuItem value="CIVIL">CIVIL</MenuItem>
+                
               </Field>
 
               <Field
