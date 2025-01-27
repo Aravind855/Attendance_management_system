@@ -51,9 +51,10 @@ const SuperAdminHome = () => {
   const [newStaff, setNewStaff] = useState({
     name: "",
     email: "",
-    mobile_number: "",
     password: "",
   });
+  const [formErrors, setFormErrors] = useState({});
+  const [unassignedGrades, setUnassignedGrades] = useState([]);
   let navigate = useNavigate();
 
   useEffect(() => {
@@ -70,7 +71,23 @@ const SuperAdminHome = () => {
       }
     };
 
+    const checkUnassignedGrades = async () => {
+      try {
+        const response = await axios.get(
+          "http://localhost:8000/api/check-unassigned-grades/"
+        );
+        if (response.data.error) {
+          setUnassignedGrades(response.data.error.split(", "));
+        }
+      } catch (err) {
+        setError(
+          err.response?.data?.error || "Failed to check unassigned grades"
+        );
+      }
+    };
+
     fetchCounts();
+    checkUnassignedGrades();
   }, []);
 
   const handleViewMembers = async (userType) => {
@@ -109,9 +126,9 @@ const SuperAdminHome = () => {
       setNewStaff({
         name: "",
         email: "",
-        mobile_number: "",
         password: "",
       });
+      setFormErrors({});
     }
   };
 
@@ -152,17 +169,36 @@ const SuperAdminHome = () => {
     }
   };
 
+  const handleRemoveStaff = async (staffId) => {
+    setLoading(true);
+    try {
+      await axios.post(
+        "http://localhost:8000/api/remove-staff-from-department/",
+        {
+          staff_id: staffId,
+        }
+      );
+      handleViewMembers("staff"); // Refresh the staff list
+      setLoading(false);
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "Failed to remove staff from department"
+      );
+      setLoading(false);
+    }
+  };
+
   const handleAddStaff = async () => {
     setLoading(true);
     try {
-      await axios.post("http://localhost:8000/api/register-user/", newStaff);
+      await axios.post("http://localhost:8000/api/add-staff/", newStaff);
       setAddStaffDialogOpen(false);
       setNewStaff({
         name: "",
         email: "",
-        mobile_number: "",
         password: "",
       });
+      setFormErrors({});
       handleViewMembers("staff"); // Refresh the staff list
       setLoading(false);
     } catch (err) {
@@ -177,6 +213,36 @@ const SuperAdminHome = () => {
 
   const handleDrawerClose = () => {
     setOpen(false);
+  };
+
+  const validateForm = () => {
+    let errors = {};
+    let isValid = true;
+
+    if (!newStaff.name) {
+      errors.name = "Name is required";
+      isValid = false;
+    }
+
+    if (!newStaff.email) {
+      errors.email = "Email is required";
+      isValid = false;
+    }
+
+    if (!newStaff.password) {
+      errors.password = "Password is required";
+      isValid = false;
+    }
+
+    setFormErrors(errors);
+    return isValid;
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (validateForm()) {
+      handleAddStaff();
+    }
   };
 
   if (loading) {
@@ -194,13 +260,7 @@ const SuperAdminHome = () => {
     );
   }
 
-  if (error) {
-    return (
-      <Container>
-        <Alert severity="error">{error}</Alert>
-      </Container>
-    );
-  }
+ 
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -269,6 +329,29 @@ const SuperAdminHome = () => {
             <Typography variant="h6" color="textSecondary" gutterBottom>
               This is the super admin dashboard.
             </Typography>
+            {unassignedGrades.length > 0 && (
+              <Box
+                sx={{
+                  my: 2,
+                  p: 2,
+                  backgroundColor: "#fff7e6",
+                  border: "1px solid #ffcc80",
+                  borderRadius: "8px",
+                }}
+              >
+                <Typography variant="body1" color="textSecondary">
+                  The following grades are unassigned:
+                </Typography>
+                <ul>
+                  {unassignedGrades.map((grade, index) => (
+                    <li key={index}>
+                      <Typography variant="body2">{grade}</Typography>
+                    </li>
+                  ))}
+                </ul>
+              </Box>
+            )}
+
             {counts && (
               <Box sx={{ display: "flex", gap: 4, mb: 4 }}>
                 <Paper elevation={3} sx={{ p: 2, textAlign: "center" }}>
@@ -315,7 +398,6 @@ const SuperAdminHome = () => {
                     <TableCell>ID</TableCell>
                     <TableCell>Name</TableCell>
                     <TableCell>Email</TableCell>
-                    <TableCell>Mobile Number</TableCell>
                     <TableCell>Academic Year</TableCell>
                     <TableCell>Department</TableCell>
                     <TableCell>Date of Birth</TableCell>
@@ -328,7 +410,6 @@ const SuperAdminHome = () => {
                       <TableCell>{student._id}</TableCell>
                       <TableCell>{student.name}</TableCell>
                       <TableCell>{student.email}</TableCell>
-                      <TableCell>{student.mobile_number}</TableCell>
                       <TableCell>{student.academic_year}</TableCell>
                       <TableCell>{student.department}</TableCell>
                       <TableCell>{student.date_of_birth}</TableCell>
@@ -362,8 +443,8 @@ const SuperAdminHome = () => {
                     <TableCell>ID</TableCell>
                     <TableCell>Name</TableCell>
                     <TableCell>Email</TableCell>
-                    <TableCell>Mobile Number</TableCell>
                     <TableCell>User Type</TableCell>
+                    <TableCell>Assigned Department</TableCell>
                     <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -373,8 +454,10 @@ const SuperAdminHome = () => {
                       <TableCell>{staff._id}</TableCell>
                       <TableCell>{staff.name}</TableCell>
                       <TableCell>{staff.email}</TableCell>
-                      <TableCell>{staff.mobile_number}</TableCell>
                       <TableCell>{staff.user_type}</TableCell>
+                      <TableCell>
+                        {staff.department || "Not Assigned"}
+                      </TableCell>
                       <TableCell>
                         <Button
                           variant="contained"
@@ -383,6 +466,15 @@ const SuperAdminHome = () => {
                         >
                           Assign
                         </Button>
+                        {staff.department && (
+                          <Button
+                            variant="contained"
+                            color="secondary"
+                            onClick={() => handleRemoveStaff(staff._id)}
+                          >
+                            Remove
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -434,48 +526,48 @@ const SuperAdminHome = () => {
       >
         <DialogTitle>Add Staff</DialogTitle>
         <DialogContent>
-          <TextField
-            label="Name"
-            value={newStaff.name}
-            onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
-            fullWidth
-            variant="outlined"
-            margin="normal"
-          />
-          <TextField
-            label="Email"
-            value={newStaff.email}
-            onChange={(e) =>
-              setNewStaff({ ...newStaff, email: e.target.value })
-            }
-            fullWidth
-            variant="outlined"
-            margin="normal"
-          />
-          <TextField
-            label="Mobile Number"
-            value={newStaff.mobile_number}
-            onChange={(e) =>
-              setNewStaff({ ...newStaff, mobile_number: e.target.value })
-            }
-            fullWidth
-            variant="outlined"
-            margin="normal"
-          />
-          <TextField
-            label="Password"
-            type="password"
-            value={newStaff.password}
-            onChange={(e) =>
-              setNewStaff({ ...newStaff, password: e.target.value })
-            }
-            fullWidth
-            variant="outlined"
-            margin="normal"
-          />
-          <Button variant="contained" color="primary" onClick={handleAddStaff}>
-            Add Staff
-          </Button>
+          <form onSubmit={handleSubmit}>
+            <TextField
+              label="Name"
+              value={newStaff.name}
+              onChange={(e) =>
+                setNewStaff({ ...newStaff, name: e.target.value })
+              }
+              fullWidth
+              variant="outlined"
+              margin="normal"
+              error={!!formErrors.name}
+              helperText={formErrors.name}
+            />
+            <TextField
+              label="Email"
+              value={newStaff.email}
+              onChange={(e) =>
+                setNewStaff({ ...newStaff, email: e.target.value })
+              }
+              fullWidth
+              variant="outlined"
+              margin="normal"
+              error={!!formErrors.email}
+              helperText={formErrors.email}
+            />
+            <TextField
+              label="Password"
+              type="password"
+              value={newStaff.password}
+              onChange={(e) =>
+                setNewStaff({ ...newStaff, password: e.target.value })
+              }
+              fullWidth
+              variant="outlined"
+              margin="normal"
+              error={!!formErrors.password}
+              helperText={formErrors.password}
+            />
+            <Button variant="contained" color="primary" type="submit">
+              Add Staff
+            </Button>
+          </form>
         </DialogContent>
       </Dialog>
     </Box>

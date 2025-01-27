@@ -34,4 +34,11 @@ urlpatterns = [
         views.assign_staff_to_department,
         name="assign_department",
     ),
+    path("api/add-staff/", views.add_staff, name="add_staff"),
+    path(
+        "api/remove-staff-from-department/",
+        views.remove_staff_from_department,
+        name="remove_staff",
+    ),
+    path("api/check-unassigned-grades/", views.check_unassigned_grades, name="check_unassigned_grades"),
 ]

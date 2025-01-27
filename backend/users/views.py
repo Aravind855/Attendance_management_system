@@ -14,6 +14,7 @@ from django.core.cache import cache
 import json
 from bson import ObjectId
 from django.contrib.auth.hashers import make_password
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,12 @@ def register_user(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if not re.match(r"^\d{10}$", mobile_number):
+            return Response(
+                {"error": "Mobile number must be exactly 10 digits"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         user_data = {
             "name": name,
             "email": email,
@@ -196,6 +203,56 @@ def register_user(request):
             )
     except Exception as e:
         logger.error(f"Error in register_user: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "Internal server error"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+def add_staff(request):
+    try:
+        logger.info("Add staff request data: %s", request.data)
+        name = request.data.get("name")
+        email = request.data.get("email")
+        password = request.data.get("password")
+
+        if not all([name, email, password]):
+            missing = [
+                field
+                for field in ["name", "email", "password"]
+                if not request.data.get(field)
+            ]
+            return Response(
+                {"error": f'Missing required fields: {", ".join(missing)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+       
+
+        staff_data = {
+            "name": name,
+            "email": email,
+            "password": make_password(password),
+            "user_type": "staff",
+        }
+
+        result = db.staff.insert_one(staff_data)
+
+        if result.inserted_id:
+            logger.info("Staff added successfully: %s", email)
+            return Response(
+                {"message": "Staff added successfully", "id": str(result.inserted_id)},
+                status=status.HTTP_201_CREATED,
+            )
+        else:
+            logger.error("Failed to add staff: %s", email)
+            return Response(
+                {"error": "Failed to add staff"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+    except Exception as e:
+        logger.error(f"Error in add_staff: {str(e)}", exc_info=True)
         return Response(
             {"error": "Internal server error"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -737,6 +794,16 @@ def assign_staff_to_department(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Check if a staff member is already assigned to the department
+        existing_staff = db.staff.find_one({"department": department})
+        if existing_staff:
+            return Response(
+                {
+                    "error": f"A staff member is already assigned to the {department} department"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         staff = db.staff.find_one({"_id": ObjectId(staff_id)})
         if not staff:
             return Response(
@@ -758,5 +825,68 @@ def assign_staff_to_department(request):
         logger.error(f"Error assigning staff to department: {str(e)}", exc_info=True)
         return Response(
             {"error": "Failed to assign staff to department"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+def remove_staff_from_department(request):
+    try:
+        staff_id = request.data.get("staff_id")
+
+        if not staff_id:
+            return Response(
+                {"error": "Staff ID is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        staff = db.staff.find_one({"_id": ObjectId(staff_id)})
+        if not staff:
+            return Response(
+                {"error": "Staff not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        result = db.staff.update_one(
+            {"_id": ObjectId(staff_id)}, {"$unset": {"department": ""}}
+        )
+
+        if result.modified_count == 1:
+            return Response({"message": "Staff removed from department successfully"})
+        else:
+            return Response(
+                {"error": "Failed to remove staff from department"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    except Exception as e:
+        logger.error(f"Error removing staff from department: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "Failed to remove staff from department"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["GET"])
+def check_unassigned_grades(request):
+    try:
+        departments = ["IT", "AD", "CSE", "IOT"]
+        unassigned_departments = []
+
+        for department in departments:
+            staff = db.staff.find_one({"department": department})
+            if not staff:
+                unassigned_departments.append(department)
+
+        if unassigned_departments:
+            return Response(
+                {
+                    "error": f'Unassigned departments: {", ".join(unassigned_departments)}'
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        else:
+            return Response({"message": "All departments are assigned"})
+    except Exception as e:
+        logger.error(f"Error checking unassigned grades: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "Failed to check unassigned grades"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
