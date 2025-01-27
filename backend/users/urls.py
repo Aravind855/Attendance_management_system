@@ -34,4 +34,7 @@ urlpatterns = [
         views.assign_staff_to_department,
         name="assign_department",
     ),
+    path('api/reset-password/', views.reset_password, name='reset_password'),
+    path("api/add-student-by-staff/", views.add_student_by_staff, name="add_student_by_staff"),
+    path("api/check-student-email/", views.check_student_email, name="check_student_email"),
 ]

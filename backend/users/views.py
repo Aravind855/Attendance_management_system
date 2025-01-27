@@ -7,11 +7,12 @@ from django.core.mail import send_mail, get_connection
 from datetime import datetime, timedelta
 from django.conf import settings
 from pymongo.errors import ConnectionFailure, OperationFailure
-from .mongodb import users_collection, db
+from .mongodb import users_collection, db ,admins_collection 
 import logging
 import random
 from django.core.cache import cache
 import json
+from .models import CustomUser
 from bson import ObjectId
 from django.contrib.auth.hashers import make_password
 
@@ -265,6 +266,7 @@ def login_user(request):
             return Response(response_data)
 
         user = db.staff.find_one({"email": email})
+
 
         if not user:
             return Response(
@@ -584,23 +586,54 @@ def submit_student_data(request):
     try:
         data = request.data
         email = data.get("email")
+        password = data.get("password")
+
         if not email:
             return Response(
                 {"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST
             )
-
-        existing_data = db.students_data.find_one({"email": email})
-        if existing_data:
+        if not password:
             return Response(
-                {"error": "Student data already exists"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Password is required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        db.students_data.insert_one(data)
-        return Response(
-            {"message": "Student data submitted successfully"},
-            status=status.HTTP_201_CREATED,
-        )
+        hashed_password = make_password(password)
+        data["password"] = hashed_password
+        data["user_type"] = "user"
+
+        logger.info(f"submit_student_data: Received email: {email}")
+
+        existing_student = db.students.find_one({"email": email})
+
+        if existing_student:
+            logger.info(f"submit_student_data: Existing student found for email: {email}")
+            result = db.students.update_one({"email": email}, {"$set": data})
+            logger.info(f"submit_student_data: Update result: {result.raw_result}")
+            if result.modified_count > 0:
+                return Response(
+                    {"message": "Student data updated successfully"},
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                return Response(
+                    {"error": "Failed to update student data"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+        else:
+            logger.info(f"submit_student_data: No existing student found for email: {email}")
+            result = db.students.insert_one(data)
+            logger.info(f"submit_student_data: Insert result: {result.inserted_id}")
+            if result.inserted_id:
+                return Response(
+                    {"message": "Student data submitted successfully"},
+                    status=status.HTTP_201_CREATED,
+                )
+            else:
+                return Response(
+                    {"error": "Failed to submit student data"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
     except Exception as e:
         logger.error(f"Error submitting student data: {str(e)}", exc_info=True)
         return Response(
@@ -758,5 +791,124 @@ def assign_staff_to_department(request):
         logger.error(f"Error assigning staff to department: {str(e)}", exc_info=True)
         return Response(
             {"error": "Failed to assign staff to department"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+def reset_password(request):
+    try:
+        email = request.data.get("email")
+        new_password = request.data.get("new_password")
+        if not all([email, new_password]):
+            return Response(
+                {"error": "Email and new password are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = db.staff.find_one({"email": email})
+        student = db.students.find_one({"email": email})
+
+        if user:
+            db.staff.update_one({"email": email}, {"$set": {"password": make_password(new_password)}})
+            return Response({"message": "Password reset successfully"})
+        elif student:
+            db.students.update_one({"email": email}, {"$set": {"password": make_password(new_password)}})
+            return Response({"message": "Password reset successfully"})
+        else:
+            return Response(
+                {"error": "Email not registered"}, status=status.HTTP_400_BAD_REQUEST
+            )
+    except Exception as e:
+        logger.error(f"Error in reset_password: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "Failed to reset password"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+def add_student_by_staff(request):
+    if request.method == "POST":
+        try:
+            name = request.data.get("name")
+            email = request.data.get("email")
+            logger.info(f"Received data - name: {name}, email: {email}")
+
+            if not all([name, email]):
+                return Response(
+                    {"error": "Name and email are required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if not email.endswith("@snsce.ac.in"):
+                return Response(
+                    {"error": "Please use a valid SNSCE email address for students"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            existing_student = db.students.find_one({"email": email})
+            if existing_student:
+                return Response(
+                    {"error": "Student with this email already exists"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            student_data = {
+                "name": name,
+                "email": email,
+            }
+
+            logger.info(f"Attempting to insert student data: {student_data}")
+            result = db.students.insert_one(student_data)
+            logger.info(f"Insert result: {result}")
+
+            if result.inserted_id:
+                logger.info(f"Student added by staff: {email}")
+                return Response(
+                    {"message": "Student added successfully", "id": str(result.inserted_id)},
+                    status=status.HTTP_201_CREATED,
+                )
+            else:
+                logger.error(f"Failed to add student: {email}")
+                return Response(
+                    {"error": "Failed to add student"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        except Exception as e:
+            logger.error(f"Error in add_student_by_staff: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Internal server error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+@api_view(["POST"])
+def check_student_email(request):
+    try:
+        email = request.data.get("email")
+        if not email:
+            return Response(
+                {"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not email.endswith("@snsce.ac.in"):
+            return Response(
+                {"error": "Please use a valid SNSCE email address"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        student = db.students.find_one({"email": email})
+        if student:
+            return Response({"message": "Email found"}, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {"error": "Email not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+    except Exception as e:
+        logger.error(f"Error in check_student_email: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "Internal server error"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

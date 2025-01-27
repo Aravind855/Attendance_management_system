@@ -24,10 +24,16 @@ const Login = () => {
   const [userType, setUserType] = useState('user');
   const navigate = useNavigate();
   const [error, setError] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registrationEmail, setRegistrationEmail] = useState('');
+  const [registrationError, setRegistrationError] = useState('');
 
   const handleTabChange = (event, newValue) => {
     setUserType(newValue);
     setError('');
+    setIsRegistering(false);
+    setRegistrationEmail('');
+    setRegistrationError('');
   };
 
   const handleSubmit = async (values, { setSubmitting }) => {
@@ -60,15 +66,7 @@ const Login = () => {
       if (response.data.user_type === 'admin') {
         navigate('/admin-home');
       } else {
-        if (response.data.is_student) {
-          if (response.data.has_student_data) {
-            navigate('/user-home');
-          } else {
-            navigate('/StudentForm');
-          }
-        } else {
-          navigate('/user-home');
-        }
+        navigate('/user-home');
       }
     } catch (err) {
       if (userType === 'user') {
@@ -78,6 +76,35 @@ const Login = () => {
       }
     }
     setSubmitting(false);
+  };
+
+  const handleRegisterClick = () => {
+    setIsRegistering(true);
+    setRegistrationError('');
+  };
+
+  const handleRegistrationEmailChange = (event) => {
+    setRegistrationEmail(event.target.value);
+    setRegistrationError('');
+  };
+
+  const handleRegistrationSubmit = async () => {
+    if (!registrationEmail.endsWith('@snsce.ac.in')) {
+      setRegistrationError('Please use a valid SNSCE email address.');
+      return;
+    }
+
+    try {
+      const response = await axios.post('/api/check-student-email/', { email: registrationEmail });
+      if (response.status === 200) {
+        navigate('/StudentForm', { state: { registrationEmail } });
+      } else {
+        setRegistrationError('Email not found in student records.');
+      }
+    } catch (error) {
+      setRegistrationError('Email not found in student records.');
+      console.error('Error checking student email:', error);
+    }
   };
 
   return (
@@ -138,6 +165,48 @@ const Login = () => {
                 </MuiLink>
               </Box>
               
+              {isRegistering && (
+                <Box sx={{ mt: 1, mb: 2 }}>
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="SNSCE Email for Registration"
+                    type="email"
+                    value={registrationEmail}
+                    onChange={handleRegistrationEmailChange}
+                    error={!!registrationError}
+                    helperText={registrationError}
+                  />
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    color="primary"
+                    sx={{ mt: 2 }}
+                    onClick={handleRegistrationSubmit}
+                  >
+                    Register
+                  </Button>
+                  {registrationError && (
+                    <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                      {registrationError}
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
+              {userType === 'user' && !isRegistering && (
+                <Box sx={{ mt: 1, textAlign: 'center' }}>
+                  <MuiLink
+                    component="button"
+                    variant="body2"
+                    onClick={handleRegisterClick}
+                    sx={{ cursor: 'pointer', textDecoration: 'underline', border: 'none', background: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', color: 'inherit' }}
+                  >
+                    Register here
+                  </MuiLink>
+                </Box>
+              )}
+
               <Button
                 type="submit"
                 fullWidth
