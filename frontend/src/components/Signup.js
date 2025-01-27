@@ -62,7 +62,6 @@ const Signup = () => {
   const [verificationError, setVerificationError] = useState('');
   const [mobileVerificationError, setMobileVerificationError] = useState('');
   
-  // Add snackbar state
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',

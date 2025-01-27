@@ -72,7 +72,7 @@ const AdminHome = () => {
           </Grid>
         </Grid>
 
-        {/* Admin Actions */}
+        {}
         <Paper sx={{ p: 3, mt: 3 }}>
           <Typography variant="h6" gutterBottom>
             Staff Actions

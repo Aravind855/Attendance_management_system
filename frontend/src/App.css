@@ -23,30 +23,25 @@ body {
   margin: 0 0.5rem;
 }
 
-/* Form styles */
 .MuiTextField-root {
   margin-bottom: 1rem;
 }
 
-/* Error message styles */
 .error-message {
   color: #f44336;
   margin: 0.5rem 0;
 }
 
-/* Success message styles */
 .success-message {
   color: #4caf50;
   margin: 0.5rem 0;
 }
 
-/* OTP input styles */
 .otp-input {
   letter-spacing: 0.5rem;
   text-align: center;
 }
 
-/* Responsive adjustments */
 @media (max-width: 600px) {
   .MuiContainer-root {
     padding-top: 1rem;

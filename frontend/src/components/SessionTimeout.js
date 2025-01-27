@@ -8,7 +8,7 @@ const SessionTimeout = ({ children }) => {
 
   const resetTimeout = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(handleLogout, 30 * 1000); // 30 seconds of inactivity
+    timeoutRef.current = setTimeout(handleLogout, 30 * 1000);
   };
 
   const handleLogout = () => {
