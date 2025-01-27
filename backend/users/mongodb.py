@@ -19,7 +19,7 @@ try:
     logger.info("Successfully connected to MongoDB Atlas!")
     
 
-    db = client["Attendance_management_system"]
+    db = client["attendance"]
     users_collection = db["students"]
     admins_collection = db["staffs"]
 
