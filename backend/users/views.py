@@ -956,7 +956,7 @@ def get_department_students(request):
         students = list(db.students.find({"department": department_name}))
         for student in students:
             student["_id"] = str(student["_id"])
-
+            # Add any other fields you want to return
         return Response({"students": students}, status=status.HTTP_200_OK)
 
     except Exception as e:

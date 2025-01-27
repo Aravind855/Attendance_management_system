@@ -47,6 +47,9 @@ const AdminHome = () => {
     const [allStudents, setAllStudents] = useState([]);
     const [attendanceData, setAttendanceData] = useState({});
     const [attendanceSubmitStatus, setAttendanceSubmitStatus] = useState(null);
+    const [departmentFilter, setDepartmentFilter] = useState('');
+    const [academicYearFilter, setAcademicYearFilter] = useState('');
+    const [attendanceAction, setAttendanceAction] = useState('Present'); // Default attendance action
 
     useEffect(() => {
         const userInfo = localStorage.getItem('userInfo');
@@ -63,6 +66,7 @@ const AdminHome = () => {
         setAdmin(user);
         console.log("Admin Department:", user.department);
         fetchDepartmentStudents(user.department);
+        fetchAllStudents(); // Fetch all students on load
     }, [navigate]);
 
     useEffect(() => {
@@ -186,7 +190,7 @@ const AdminHome = () => {
                     </ListItemButton>
                 </ListItem>
                 <ListItem disablePadding>
-                    <ListItemButton selected={selectedAction === 'all_students'} onClick={() => { handleActionClick('all_students'); fetchAllStudents(); }}>
+                    <ListItemButton selected={selectedAction === 'all_students'} onClick={() => handleActionClick('all_students')}>
                         <ListItemIcon><ListIcon /></ListItemIcon>
                         <ListItemText primary="All Students" />
                     </ListItemButton>
@@ -223,26 +227,96 @@ const AdminHome = () => {
                 return (
                     <Paper sx={{ p: 2, mt: 2 }}>
                         <Typography variant="h6" gutterBottom>Department Students ({admin.department})</Typography>
-                        <List>
-                            {departmentStudents.map((student) => (
-                                <ListItem key={student._id}>
-                                    <ListItemText primary={student.name} secondary={student.email} />
-                                </ListItem>
-                            ))}
-                        </List>
+                        <FormControl fullWidth margin="normal">
+                            <InputLabel id="department-filter-label">Filter by Department</InputLabel>
+                            <Select
+                                labelId="department-filter-label"
+                                value={departmentFilter}
+                                onChange={(e) => setDepartmentFilter(e.target.value)}
+                            >
+                                <MenuItem value="">All Departments</MenuItem>
+                                {/* Add other department options here */}
+                            </Select>
+                        </FormControl>
+                        <TableContainer component={Paper}>
+                            <Table aria-label="department students table">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell><b>Name</b></TableCell>
+                                        <TableCell align="right"><b>Email</b></TableCell>
+                                        <TableCell align="right"><b>Registration No.</b></TableCell>
+                                        <TableCell align="right"><b>Department</b></TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {departmentStudents.filter(student => 
+                                        !departmentFilter || student.department === departmentFilter
+                                    ).map((student) => (
+                                        <TableRow key={student._id}>
+                                            <TableCell component="th" scope="row">{student.name}</TableCell>
+                                            <TableCell align="right">{student.email}</TableCell>
+                                            <TableCell align="right">{student.registration_no}</TableCell>
+                                            <TableCell align="right">{student.department}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
                     </Paper>
                 );
             case 'all_students':
                 return (
                     <Paper sx={{ p: 2, mt: 2 }}>
                         <Typography variant="h6" gutterBottom>All Students</Typography>
-                        <List>
-                            {departmentStudents.map((student) => (
-                                <ListItem key={student._id}>
-                                    <ListItemText primary={student.name} secondary={student.email} />
-                                </ListItem>
-                            ))}
-                        </List>
+                        <FormControl fullWidth margin="normal">
+                            <InputLabel id="academic-year-filter-label">Filter by Academic Year</InputLabel>
+                            <Select
+                                labelId="academic-year-filter-label"
+                                value={academicYearFilter}
+                                onChange={(e) => setAcademicYearFilter(e.target.value)}
+                            >
+                                <MenuItem value="">All Academic Years</MenuItem>
+                                {/* Add other academic year options here */}
+                            </Select>
+                        </FormControl>
+                        <TableContainer component={Paper}>
+                            <Table aria-label="all students table">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell><b>Name</b></TableCell>
+                                        <TableCell align="right"><b>Email</b></TableCell>
+                                        <TableCell align="right"><b>Registration No.</b></TableCell>
+                                        <TableCell align="right"><b>Department</b></TableCell>
+                                        <TableCell align="right"><b>Mobile Number</b></TableCell>
+                                        <TableCell align="right"><b>Date of Birth</b></TableCell>
+                                        <TableCell align="right"><b>Gender</b></TableCell>
+                                        <TableCell align="right"><b>Academic Year</b></TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {allStudents.filter(student => 
+                                        !academicYearFilter || student.academic_year === academicYearFilter
+                                    ).map((student) => {
+                                        // Check if all required fields are present
+                                        if (!student.name || !student.email || !student.registration_no || !student.department) {
+                                            return null; // Skip rendering this student if any required field is missing
+                                        }
+                                        return (
+                                            <TableRow key={student._id}>
+                                                <TableCell component="th" scope="row">{student.name}</TableCell>
+                                                <TableCell align="right">{student.email}</TableCell>
+                                                <TableCell align="right">{student.registration_no}</TableCell>
+                                                <TableCell align="right">{student.department}</TableCell>
+                                                <TableCell align="right">{student.mobile_number || '-'}</TableCell>
+                                                <TableCell align="right">{student.dob || '-'}</TableCell>
+                                                <TableCell align="right">{student.gender || '-'}</TableCell>
+                                                <TableCell align="right">{student.academic_year || '-'}</TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
                     </Paper>
                 );
             case 'add_students':
@@ -316,6 +390,18 @@ const AdminHome = () => {
                     <Paper sx={{ p: 2, mt: 2 }}>
                         <Typography variant="h6" gutterBottom>Mark Attendance - {admin.department} Department</Typography>
                         <Typography variant="subtitle1" gutterBottom>Date: {formattedDate}, Time: {formattedTime}</Typography>
+                        <FormControl fullWidth margin="normal">
+                            <InputLabel id="attendance-action-label">Attendance Action</InputLabel>
+                            <Select
+                                labelId="attendance-action-label"
+                                value={attendanceAction} // Add state for attendance action
+                                onChange={(e) => setAttendanceAction(e.target.value)} // Update state on change
+                            >
+                                <MenuItem value="Present">Present</MenuItem>
+                                <MenuItem value="Absent">Absent</MenuItem>
+                                <MenuItem value="Late">Late</MenuItem>
+                            </Select>
+                        </FormControl>
                         <TableContainer component={Paper}>
                             <Table aria-label="attendance table">
                                 <TableHead>
