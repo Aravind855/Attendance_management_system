@@ -226,7 +226,7 @@ def login_user(request):
                 'email': student['email'],
                 'user_type': 'user',
                 'is_student': True,
-                'name': student.get('name', ''),  # Add default value if name doesn't exist
+                'name': student.get('name', ''),  
                 'mobile_number': student.get('mobile_number', ''),
                 'has_student_data': has_student_data
             }
