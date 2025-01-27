@@ -16,11 +16,23 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    FormControlLabel,
+    RadioGroup,
+    Radio,
+    FormLabel,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
 } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ReportIcon from '@mui/icons-material/Report';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
+import ListIcon from '@mui/icons-material/List';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -31,6 +43,10 @@ const AdminHome = () => {
     const [numStudentsToAdd, setNumStudentsToAdd] = useState(1);
     const [studentData, setStudentData] = useState([]);
     const [addStudentStatus, setAddStudentStatus] = useState(null);
+    const [departmentStudents, setDepartmentStudents] = useState([]);
+    const [allStudents, setAllStudents] = useState([]);
+    const [attendanceData, setAttendanceData] = useState({}); // State to hold attendance status for each student
+    const [attendanceSubmitStatus, setAttendanceSubmitStatus] = useState(null);
 
     useEffect(() => {
         const userInfo = localStorage.getItem('userInfo');
@@ -45,6 +61,7 @@ const AdminHome = () => {
             return;
         }
         setAdmin(user);
+        fetchDepartmentStudents(user.department);
     }, [navigate]);
 
     useEffect(() => {
@@ -99,9 +116,92 @@ const AdminHome = () => {
         }
     };
 
+    const fetchDepartmentStudents = async (department) => {
+        try {
+            const response = await axios.get('/api/get-department-students/', { params: { department } });
+            setDepartmentStudents(response.data.students);
+        } catch (error) {
+            console.error("Error fetching department students:", error);
+        }
+    };
+
+    const fetchAllStudents = async () => {
+        try {
+            const response = await axios.get('/api/get-all-students/');
+            setAllStudents(response.data.students);
+        } catch (error) {
+            console.error("Error fetching all students:", error);
+        }
+    };
+
+    const handleActionClick = (action) => {
+        setSelectedAction(action);
+    };
+
+    const handleAttendanceChange = (studentId) => {
+        setAttendanceData(prevData => {
+            const currentStatus = prevData[studentId];
+            const newStatus = currentStatus === 'Present' ? 'Absent' : 'Present'; // Toggle between Present and Absent
+            return {
+                ...prevData,
+                [studentId]: newStatus,
+            };
+        });
+    };
+
+    const handleSubmitAttendance = async () => {
+        setAttendanceSubmitStatus({ status: 'loading', message: 'Submitting attendance...' });
+        try {
+            // Prepare attendance data for backend
+            const attendanceRecords = Object.keys(attendanceData).map(studentId => ({
+                studentId: studentId,
+                status: attendanceData[studentId],
+                date: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
+            }));
+
+            const response = await axios.post('/api/mark-attendance/', { attendanceRecords: attendanceRecords });
+            if (response.status === 200) {
+                setAttendanceSubmitStatus({ status: 'success', message: 'Attendance submitted successfully!' });
+                // Reset attendanceData after successful submission if needed
+                setAttendanceData({});
+            } else {
+                setAttendanceSubmitStatus({ status: 'error', message: 'Failed to submit attendance.' });
+            }
+        } catch (error) {
+            console.error("Error submitting attendance:", error);
+            setAttendanceSubmitStatus({ status: 'error', message: 'Error submitting attendance. Please check console.' });
+        }
+    };
+
     const renderMainContent = () => {
         switch (selectedAction) {
-            case 'addStudent':
+            case 'students':
+                return (
+                    <Paper sx={{ p: 2, mt: 2 }}>
+                        <Typography variant="h6" gutterBottom>Department Students ({admin.department})</Typography>
+                        <List>
+                            {departmentStudents.map((student) => (
+                                <ListItem key={student._id}>
+                                    <ListItemText primary={student.name} secondary={student.email} />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Paper>
+                );
+            case 'all_students':
+                return (
+                    <Paper sx={{ p: 2, mt: 2 }}>
+                        <Typography variant="h6" gutterBottom>All Students</Typography>
+                        <List>
+                            {allStudents.map((student) => (
+                                <ListItem key={student._id}>
+                                    <ListItemText primary={student.name} secondary={student.email} />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Paper>
+                );
+            case 'add_students':
                 return (
                     <Paper sx={{ p: 3, mt: 3 }}>
                         <Typography variant="h6" gutterBottom>
@@ -162,31 +262,62 @@ const AdminHome = () => {
                         </form>
                     </Paper>
                 );
-            case 'manageStudents':
+            case 'settings':
+                return <Paper sx={{ p: 2, mt: 2 }}> <Typography>Settings Content</Typography> </Paper>;
+            case 'reports':
+                return <Paper sx={{ p: 2, mt: 2 }}> <Typography>Reports Content</Typography> </Paper>;
+            case 'mark_attendance':
                 return (
-                    <Paper sx={{ p: 3, mt: 3 }}>
-                        <Typography variant="h6" gutterBottom>
-                            Manage Students
-                        </Typography>
-                        <Typography>Functionality to manage students will be here.</Typography>
-                    </Paper>
-                );
-            case 'systemSettings':
-                return (
-                    <Paper sx={{ p: 3, mt: 3 }}>
-                        <Typography variant="h6" gutterBottom>
-                            System Settings
-                        </Typography>
-                        <Typography>System settings options will be here.</Typography>
-                    </Paper>
-                );
-            case 'viewReports':
-                return (
-                    <Paper sx={{ p: 3, mt: 3 }}>
-                        <Typography variant="h6" gutterBottom>
-                            View Reports
-                        </Typography>
-                        <Typography>Reports and analytics will be displayed here.</Typography>
+                    <Paper sx={{ p: 2, mt: 2 }}>
+                        <Typography variant="h6" gutterBottom>Mark Attendance - {admin.department} Department</Typography>
+                        <TableContainer component={Paper}>
+                            <Table aria-label="attendance table">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell><b>Student Name</b></TableCell>
+                                        <TableCell align="right"><b>Registration No.</b></TableCell>
+                                        <TableCell align="center"><b>Attendance Status</b></TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {departmentStudents.map((student) => (
+                                        <TableRow key={student._id}>
+                                            <TableCell component="th" scope="row">
+                                                <Button
+                                                    onClick={() => handleAttendanceChange(student._id)}
+                                                    style={{ textDecoration: 'none', color: 'inherit' }}
+                                                >
+                                                    {student.name}
+                                                </Button>
+                                            </TableCell>
+                                            <TableCell align="right">{student.registration_no}</TableCell>
+                                            <TableCell align="center">
+                                                {attendanceData[student._id] === 'Present' ? (
+                                                    <Typography color="success">Present</Typography>
+                                                ) : attendanceData[student._id] === 'Absent' ? (
+                                                    <Typography color="error">Absent</Typography>
+                                                ) : (
+                                                    <Typography>-</Typography>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+
+                        <Button variant="contained" color="primary" onClick={handleSubmitAttendance} sx={{ mt: 2 }}>
+                            Submit Attendance
+                        </Button>
+                        {attendanceSubmitStatus && (
+                            <Typography
+                                variant="body2"
+                                color={attendanceSubmitStatus.status === 'success' ? 'success.main' : 'error.main'}
+                                sx={{ mt: 1 }}
+                            >
+                                {attendanceSubmitStatus.message}
+                            </Typography>
+                        )}
                     </Paper>
                 );
             default:
@@ -211,23 +342,39 @@ const AdminHome = () => {
                 </Typography>
                 <List>
                     <ListItem disablePadding>
-                        <ListItemButton onClick={() => handleSidebarItemClick('addStudent')}>
-                            <ListItemIcon>
-                                <AddCircleIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Add Student" />
-                        </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                        <ListItemButton onClick={() => handleSidebarItemClick('manageStudents')}>
+                        <ListItemButton selected={selectedAction === 'students'} onClick={() => handleActionClick('students')}>
                             <ListItemIcon>
                                 <PeopleIcon />
                             </ListItemIcon>
-                            <ListItemText primary="Manage Students" />
+                            <ListItemText primary="Department Students" />
                         </ListItemButton>
                     </ListItem>
                     <ListItem disablePadding>
-                        <ListItemButton onClick={() => handleSidebarItemClick('systemSettings')}>
+                        <ListItemButton selected={selectedAction === 'all_students'} onClick={() => { handleActionClick('all_students'); fetchAllStudents(); }}>
+                            <ListItemIcon>
+                                <ListIcon />
+                            </ListItemIcon>
+                            <ListItemText primary="All Students" />
+                        </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                        <ListItemButton selected={selectedAction === 'add_students'} onClick={() => handleActionClick('add_students')}>
+                            <ListItemIcon>
+                                <AddCircleIcon />
+                            </ListItemIcon>
+                            <ListItemText primary="Add Students" />
+                        </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                        <ListItemButton selected={selectedAction === 'mark_attendance'} onClick={() => handleActionClick('mark_attendance')}>
+                            <ListItemIcon>
+                                <EventAvailableIcon />
+                            </ListItemIcon>
+                            <ListItemText primary="Mark Attendance" />
+                        </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                        <ListItemButton selected={selectedAction === 'settings'} onClick={() => handleActionClick('settings')}>
                             <ListItemIcon>
                                 <SettingsIcon />
                             </ListItemIcon>
@@ -235,7 +382,7 @@ const AdminHome = () => {
                         </ListItemButton>
                     </ListItem>
                     <ListItem disablePadding>
-                        <ListItemButton onClick={() => handleSidebarItemClick('viewReports')}>
+                        <ListItemButton selected={selectedAction === 'reports'} onClick={() => handleActionClick('reports')}>
                             <ListItemIcon>
                                 <ReportIcon />
                             </ListItemIcon>
