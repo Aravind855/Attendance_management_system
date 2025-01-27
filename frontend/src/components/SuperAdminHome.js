@@ -19,8 +19,21 @@ import {
   TableRow,
   TextField,
   MenuItem,
+  Drawer,
+  List,
+  ListItem,
+  ListItemText,
+  AppBar,
+  Toolbar,
+  IconButton,
+  CssBaseline,
+  Divider,
 } from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import axios from "axios";
+
+const drawerWidth = 240;
 
 const SuperAdminHome = () => {
   const [counts, setCounts] = useState(null);
@@ -33,6 +46,14 @@ const SuperAdminHome = () => {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [department, setDepartment] = useState("");
+  const [open, setOpen] = useState(false);
+  const [addStaffDialogOpen, setAddStaffDialogOpen] = useState(false);
+  const [newStaff, setNewStaff] = useState({
+    name: "",
+    email: "",
+    mobile_number: "",
+    password: "",
+  });
   let navigate = useNavigate();
 
   useEffect(() => {
@@ -83,6 +104,14 @@ const SuperAdminHome = () => {
       setAssignDialogOpen(false);
       setSelectedStaff(null);
       setDepartment("");
+    } else if (userType === "addStaff") {
+      setAddStaffDialogOpen(false);
+      setNewStaff({
+        name: "",
+        email: "",
+        mobile_number: "",
+        password: "",
+      });
     }
   };
 
@@ -123,6 +152,33 @@ const SuperAdminHome = () => {
     }
   };
 
+  const handleAddStaff = async () => {
+    setLoading(true);
+    try {
+      await axios.post("http://localhost:8000/api/register-user/", newStaff);
+      setAddStaffDialogOpen(false);
+      setNewStaff({
+        name: "",
+        email: "",
+        mobile_number: "",
+        password: "",
+      });
+      handleViewMembers("staff"); // Refresh the staff list
+      setLoading(false);
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to add staff");
+      setLoading(false);
+    }
+  };
+
+  const handleDrawerOpen = () => {
+    setOpen(true);
+  };
+
+  const handleDrawerClose = () => {
+    setOpen(false);
+  };
+
   if (loading) {
     return (
       <Container
@@ -147,63 +203,100 @@ const SuperAdminHome = () => {
   }
 
   return (
-    <Container maxWidth="md">
-      <Box
+    <Box sx={{ display: "flex" }}>
+      <CssBaseline />
+      <AppBar position="fixed" open={open}>
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            onClick={handleDrawerOpen}
+            edge="start"
+            sx={{ mr: 2, ...(open && { display: "none" }) }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6" noWrap component="div">
+            Super Admin Dashboard
+          </Typography>
+        </Toolbar>
+      </AppBar>
+      <Drawer
         sx={{
-          mt: 4,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
+          width: drawerWidth,
+          flexShrink: 0,
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+          },
         }}
+        variant="persistent"
+        anchor="left"
+        open={open}
       >
-        <Typography variant="h4" component="h1" gutterBottom>
-          Welcome, Super Admin!
-        </Typography>
-        <Typography variant="h6" color="textSecondary" gutterBottom>
-          This is the super admin dashboard.
-        </Typography>
-        {counts && (
-          <Box sx={{ display: "flex", gap: 4, mb: 4 }}>
-            <Paper elevation={3} sx={{ p: 2, textAlign: "center" }}>
-              <Typography variant="h6">Registered Students</Typography>
-              <Typography variant="h4" color="primary">
-                {counts.student_count}
-              </Typography>
-            </Paper>
-            <Paper elevation={3} sx={{ p: 2, textAlign: "center" }}>
-              <Typography variant="h6">Registered Staff</Typography>
-              <Typography variant="h4" color="secondary">
-                {counts.staff_count}
-              </Typography>
-            </Paper>
-            <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
-              <Button
-                variant="contained"
-                color="error"
-                onClick={handleLogout}
-                sx={{ minWidth: 200 }}
-              >
-                Logout
-              </Button>
-            </Box>
+        <Toolbar>
+          <IconButton onClick={handleDrawerClose}>
+            <ChevronLeftIcon />
+          </IconButton>
+        </Toolbar>
+        <Divider />
+        <List>
+          <ListItem button onClick={() => handleViewMembers("student")}>
+            <ListItemText primary="View Students" />
+          </ListItem>
+          <ListItem button onClick={() => handleViewMembers("staff")}>
+            <ListItemText primary="View Staff" />
+          </ListItem>
+          <ListItem button onClick={() => setAddStaffDialogOpen(true)}>
+            <ListItemText primary="Add Staff" />
+          </ListItem>
+        </List>
+      </Drawer>
+      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+        <Toolbar />
+        <Container maxWidth="md">
+          <Box
+            sx={{
+              mt: 4,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            <Typography variant="h4" component="h1" gutterBottom>
+              Welcome, Super Admin!
+            </Typography>
+            <Typography variant="h6" color="textSecondary" gutterBottom>
+              This is the super admin dashboard.
+            </Typography>
+            {counts && (
+              <Box sx={{ display: "flex", gap: 4, mb: 4 }}>
+                <Paper elevation={3} sx={{ p: 2, textAlign: "center" }}>
+                  <Typography variant="h6">Registered Students</Typography>
+                  <Typography variant="h4" color="primary">
+                    {counts.student_count}
+                  </Typography>
+                </Paper>
+                <Paper elevation={3} sx={{ p: 2, textAlign: "center" }}>
+                  <Typography variant="h6">Registered Staff</Typography>
+                  <Typography variant="h4" color="secondary">
+                    {counts.staff_count}
+                  </Typography>
+                </Paper>
+                <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={handleLogout}
+                    sx={{ minWidth: 200 }}
+                  >
+                    Logout
+                  </Button>
+                </Box>
+              </Box>
+            )}
           </Box>
-        )}
-        <Box sx={{ display: "flex", gap: 2 }}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => handleViewMembers("student")}
-          >
-            View Students
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => handleViewMembers("staff")}
-          >
-            View Staff
-          </Button>
-        </Box>
+        </Container>
       </Box>
 
       <Dialog
@@ -332,7 +425,60 @@ const SuperAdminHome = () => {
           </Button>
         </DialogContent>
       </Dialog>
-    </Container>
+
+      <Dialog
+        open={addStaffDialogOpen}
+        onClose={() => handleCloseDialog("addStaff")}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Add Staff</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Name"
+            value={newStaff.name}
+            onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
+            fullWidth
+            variant="outlined"
+            margin="normal"
+          />
+          <TextField
+            label="Email"
+            value={newStaff.email}
+            onChange={(e) =>
+              setNewStaff({ ...newStaff, email: e.target.value })
+            }
+            fullWidth
+            variant="outlined"
+            margin="normal"
+          />
+          <TextField
+            label="Mobile Number"
+            value={newStaff.mobile_number}
+            onChange={(e) =>
+              setNewStaff({ ...newStaff, mobile_number: e.target.value })
+            }
+            fullWidth
+            variant="outlined"
+            margin="normal"
+          />
+          <TextField
+            label="Password"
+            type="password"
+            value={newStaff.password}
+            onChange={(e) =>
+              setNewStaff({ ...newStaff, password: e.target.value })
+            }
+            fullWidth
+            variant="outlined"
+            margin="normal"
+          />
+          <Button variant="contained" color="primary" onClick={handleAddStaff}>
+            Add Staff
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </Box>
   );
 };
 
