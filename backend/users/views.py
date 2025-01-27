@@ -880,7 +880,7 @@ def check_unassigned_grades(request):
                 {
                     "error": f'Unassigned departments: {", ".join(unassigned_departments)}'
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_200_OK,
             )
         else:
             return Response({"message": "All departments are assigned"})

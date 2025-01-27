@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -28,10 +28,10 @@ import {
   IconButton,
   CssBaseline,
   Divider,
-} from "@mui/material";
-import MenuIcon from "@mui/icons-material/Menu";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import axios from "axios";
+} from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import axios from 'axios';
 
 const drawerWidth = 240;
 
@@ -40,18 +40,18 @@ const SuperAdminHome = () => {
   const [studentMembers, setStudentMembers] = useState(null);
   const [staffMembers, setStaffMembers] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [staffDialogOpen, setStaffDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState(null);
-  const [department, setDepartment] = useState("");
+  const [department, setDepartment] = useState('');
   const [open, setOpen] = useState(false);
   const [addStaffDialogOpen, setAddStaffDialogOpen] = useState(false);
   const [newStaff, setNewStaff] = useState({
-    name: "",
-    email: "",
-    password: "",
+    name: '',
+    email: '',
+    password: '',
   });
   const [formErrors, setFormErrors] = useState({});
   const [unassignedGrades, setUnassignedGrades] = useState([]);
@@ -60,29 +60,23 @@ const SuperAdminHome = () => {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const response = await axios.get(
-          "http://localhost:8000/api/get-registered-counts/"
-        );
+        const response = await axios.get('http://localhost:8000/api/get-registered-counts/');
         setCounts(response.data);
         setLoading(false);
       } catch (err) {
-        setError(err.response?.data?.error || "Failed to fetch counts");
+        setError(err.response?.data?.error || 'Failed to fetch counts');
         setLoading(false);
       }
     };
 
     const checkUnassignedGrades = async () => {
       try {
-        const response = await axios.get(
-          "http://localhost:8000/api/check-unassigned-grades/"
-        );
+        const response = await axios.get('http://localhost:8000/api/check-unassigned-grades/');
         if (response.data.error) {
-          setUnassignedGrades(response.data.error.split(", "));
+          setUnassignedGrades(response.data.error.split(', '));
         }
       } catch (err) {
-        setError(
-          err.response?.data?.error || "Failed to check unassigned grades"
-        );
+        setError(err.response?.data?.error || 'Failed to check unassigned grades');
       }
     };
 
@@ -93,40 +87,36 @@ const SuperAdminHome = () => {
   const handleViewMembers = async (userType) => {
     setLoading(true);
     try {
-      const response = await axios.get(
-        `http://localhost:8000/api/get-registered-members/?user_type=${userType}`
-      );
-      if (userType === "student") {
+      const response = await axios.get(`http://localhost:8000/api/get-registered-members/?user_type=${userType}`);
+      if (userType === 'student') {
         setStudentMembers(response.data.members);
         setStudentDialogOpen(true);
-      } else if (userType === "staff") {
+      } else if (userType === 'staff') {
         setStaffMembers(response.data.members);
         setStaffDialogOpen(true);
       }
       setLoading(false);
     } catch (err) {
-      setError(
-        err.response?.data?.error || `Failed to fetch ${userType} members`
-      );
+      setError(`err.response?.data?.error || Failed to fetch ${userType} members`);
       setLoading(false);
     }
   };
 
   const handleCloseDialog = (userType) => {
-    if (userType === "student") {
+    if (userType === 'student') {
       setStudentDialogOpen(false);
-    } else if (userType === "staff") {
+    } else if (userType === 'staff') {
       setStaffDialogOpen(false);
-    } else if (userType === "assign") {
+    } else if (userType === 'assign') {
       setAssignDialogOpen(false);
       setSelectedStaff(null);
-      setDepartment("");
-    } else if (userType === "addStaff") {
+      setDepartment('');
+    } else if (userType === 'addStaff') {
       setAddStaffDialogOpen(false);
       setNewStaff({
-        name: "",
-        email: "",
-        password: "",
+        name: '',
+        email: '',
+        password: '',
       });
       setFormErrors({});
     }
@@ -149,22 +139,17 @@ const SuperAdminHome = () => {
   const handleAssign = async () => {
     setLoading(true);
     try {
-      await axios.post(
-        "http://localhost:8000/api/assign-staff-to-department/",
-        {
-          staff_id: selectedStaff._id,
-          department,
-        }
-      );
+      await axios.post('http://localhost:8000/api/assign-staff-to-department/', {
+        staff_id: selectedStaff._id,
+        department,
+      });
       setAssignDialogOpen(false);
       setSelectedStaff(null);
-      setDepartment("");
-      handleViewMembers("staff"); // Refresh the staff list
+      setDepartment('');
+      handleViewMembers('staff'); // Refresh the staff list
       setLoading(false);
     } catch (err) {
-      setError(
-        err.response?.data?.error || "Failed to assign staff to department"
-      );
+      setError(err.response?.data?.error || 'Failed to assign staff to department');
       setLoading(false);
     }
   };
@@ -172,18 +157,13 @@ const SuperAdminHome = () => {
   const handleRemoveStaff = async (staffId) => {
     setLoading(true);
     try {
-      await axios.post(
-        "http://localhost:8000/api/remove-staff-from-department/",
-        {
-          staff_id: staffId,
-        }
-      );
-      handleViewMembers("staff"); // Refresh the staff list
+      await axios.post('http://localhost:8000/api/remove-staff-from-department/', {
+        staff_id: staffId,
+      });
+      handleViewMembers('staff'); // Refresh the staff list
       setLoading(false);
     } catch (err) {
-      setError(
-        err.response?.data?.error || "Failed to remove staff from department"
-      );
+      setError(err.response?.data?.error || 'Failed to remove staff from department');
       setLoading(false);
     }
   };
@@ -191,18 +171,18 @@ const SuperAdminHome = () => {
   const handleAddStaff = async () => {
     setLoading(true);
     try {
-      await axios.post("http://localhost:8000/api/add-staff/", newStaff);
+      await axios.post('http://localhost:8000/api/add-staff/', newStaff);
       setAddStaffDialogOpen(false);
       setNewStaff({
-        name: "",
-        email: "",
-        password: "",
+        name: '',
+        email: '',
+        password: '',
       });
       setFormErrors({});
-      handleViewMembers("staff"); // Refresh the staff list
+      handleViewMembers('staff'); // Refresh the staff list
       setLoading(false);
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to add staff");
+      setError(err.response?.data?.error || 'Failed to add staff');
       setLoading(false);
     }
   };
@@ -220,17 +200,17 @@ const SuperAdminHome = () => {
     let isValid = true;
 
     if (!newStaff.name) {
-      errors.name = "Name is required";
+      errors.name = 'Name is required';
       isValid = false;
     }
 
     if (!newStaff.email) {
-      errors.email = "Email is required";
+      errors.email = 'Email is required';
       isValid = false;
     }
 
     if (!newStaff.password) {
-      errors.password = "Password is required";
+      errors.password = 'Password is required';
       isValid = false;
     }
 
@@ -247,20 +227,15 @@ const SuperAdminHome = () => {
 
   if (loading) {
     return (
-      <Container
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "80vh",
-        }}
-      >
+      <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
         <CircularProgress />
       </Container>
     );
   }
 
- 
+  if (error) {
+    return <Container><Alert severity="error">{error}</Alert></Container>;
+  }
 
   return (
     <Box sx={{ display: "flex" }}>
@@ -279,6 +254,15 @@ const SuperAdminHome = () => {
           <Typography variant="h6" noWrap component="div">
             Super Admin Dashboard
           </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleLogout}
+            sx={{ minWidth: 100 }}
+          >
+            Logout
+          </Button>
         </Toolbar>
       </AppBar>
       <Drawer
@@ -330,28 +314,10 @@ const SuperAdminHome = () => {
               This is the super admin dashboard.
             </Typography>
             {unassignedGrades.length > 0 && (
-              <Box
-                sx={{
-                  my: 2,
-                  p: 2,
-                  backgroundColor: "#fff7e6",
-                  border: "1px solid #ffcc80",
-                  borderRadius: "8px",
-                }}
-              >
-                <Typography variant="body1" color="textSecondary">
-                  The following grades are unassigned:
-                </Typography>
-                <ul>
-                  {unassignedGrades.map((grade, index) => (
-                    <li key={index}>
-                      <Typography variant="body2">{grade}</Typography>
-                    </li>
-                  ))}
-                </ul>
-              </Box>
+              <Alert severity="warning">
+                Unassigned Grades: {unassignedGrades.join(", ")}
+              </Alert>
             )}
-
             {counts && (
               <Box sx={{ display: "flex", gap: 4, mb: 4 }}>
                 <Paper elevation={3} sx={{ p: 2, textAlign: "center" }}>
@@ -366,16 +332,7 @@ const SuperAdminHome = () => {
                     {counts.staff_count}
                   </Typography>
                 </Paper>
-                <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    onClick={handleLogout}
-                    sx={{ minWidth: 200 }}
-                  >
-                    Logout
-                  </Button>
-                </Box>
+                
               </Box>
             )}
           </Box>
@@ -400,7 +357,6 @@ const SuperAdminHome = () => {
                     <TableCell>Email</TableCell>
                     <TableCell>Academic Year</TableCell>
                     <TableCell>Department</TableCell>
-                    <TableCell>Date of Birth</TableCell>
                     <TableCell>Gender</TableCell>
                   </TableRow>
                 </TableHead>
@@ -412,12 +368,7 @@ const SuperAdminHome = () => {
                       <TableCell>{student.email}</TableCell>
                       <TableCell>{student.academic_year}</TableCell>
                       <TableCell>{student.department}</TableCell>
-                      <TableCell>{student.date_of_birth}</TableCell>
                       <TableCell>{student.gender}</TableCell>
-                      <TableCell>{student.address}</TableCell>
-                      <TableCell>{student.parent_name}</TableCell>
-                      <TableCell>{student.parent_mobile_number}</TableCell>
-                      <TableCell>{student.blood_group}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
