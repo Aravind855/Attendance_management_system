@@ -8,7 +8,10 @@ const SessionTimeout = ({ children }) => {
 
   const resetTimeout = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
     timeoutRef.current = setTimeout(handleLogout, 15 * 60 * 1000); 
+    timeoutRef.current = setTimeout(handleLogout, 30 * 1000);
+
   };
 
   const handleLogout = () => {
