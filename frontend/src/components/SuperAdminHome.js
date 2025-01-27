@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Container,
   Typography,
@@ -16,26 +17,55 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-} from '@mui/material';
-import axios from 'axios';
+  TextField,
+  MenuItem,
+  Drawer,
+  List,
+  ListItem,
+  ListItemText,
+  AppBar,
+  Toolbar,
+  IconButton,
+  CssBaseline,
+  Divider,
+} from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import axios from "axios";
+
+const drawerWidth = 240;
 
 const SuperAdminHome = () => {
   const [counts, setCounts] = useState(null);
   const [studentMembers, setStudentMembers] = useState(null);
   const [staffMembers, setStaffMembers] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [studentDialogOpen, setStudentDialogOpen] = useState(false);
   const [staffDialogOpen, setStaffDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState(null);
+  const [department, setDepartment] = useState("");
+  const [open, setOpen] = useState(false);
+  const [addStaffDialogOpen, setAddStaffDialogOpen] = useState(false);
+  const [newStaff, setNewStaff] = useState({
+    name: "",
+    email: "",
+    mobile_number: "",
+    password: "",
+  });
+  let navigate = useNavigate();
 
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/get-registered-counts/');
+        const response = await axios.get(
+          "http://localhost:8000/api/get-registered-counts/"
+        );
         setCounts(response.data);
         setLoading(false);
       } catch (err) {
-        setError(err.response?.data?.error || 'Failed to fetch counts');
+        setError(err.response?.data?.error || "Failed to fetch counts");
         setLoading(false);
       }
     };
@@ -46,73 +76,235 @@ const SuperAdminHome = () => {
   const handleViewMembers = async (userType) => {
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:8000/api/get-registered-members/?user_type=${userType}`);
-      if (userType === 'student') {
+      const response = await axios.get(
+        `http://localhost:8000/api/get-registered-members/?user_type=${userType}`
+      );
+      if (userType === "student") {
         setStudentMembers(response.data.members);
         setStudentDialogOpen(true);
-      } else if (userType === 'staff') {
+      } else if (userType === "staff") {
         setStaffMembers(response.data.members);
         setStaffDialogOpen(true);
       }
       setLoading(false);
     } catch (err) {
-      setError(err.response?.data?.error || `Failed to fetch ${userType} members`);
+      setError(
+        err.response?.data?.error || `Failed to fetch ${userType} members`
+      );
       setLoading(false);
     }
   };
 
   const handleCloseDialog = (userType) => {
-    if (userType === 'student') {
+    if (userType === "student") {
       setStudentDialogOpen(false);
-    } else if (userType === 'staff') {
+    } else if (userType === "staff") {
       setStaffDialogOpen(false);
+    } else if (userType === "assign") {
+      setAssignDialogOpen(false);
+      setSelectedStaff(null);
+      setDepartment("");
+    } else if (userType === "addStaff") {
+      setAddStaffDialogOpen(false);
+      setNewStaff({
+        name: "",
+        email: "",
+        mobile_number: "",
+        password: "",
+      });
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("userInfo");
+    navigate("/login");
+  };
+
+  const handleAssignStaff = (staff) => {
+    setSelectedStaff(staff);
+    setAssignDialogOpen(true);
+  };
+
+  const handleDepartmentChange = (event) => {
+    setDepartment(event.target.value);
+  };
+
+  const handleAssign = async () => {
+    setLoading(true);
+    try {
+      await axios.post(
+        "http://localhost:8000/api/assign-staff-to-department/",
+        {
+          staff_id: selectedStaff._id,
+          department,
+        }
+      );
+      setAssignDialogOpen(false);
+      setSelectedStaff(null);
+      setDepartment("");
+      handleViewMembers("staff"); // Refresh the staff list
+      setLoading(false);
+    } catch (err) {
+      setError(
+        err.response?.data?.error || "Failed to assign staff to department"
+      );
+      setLoading(false);
+    }
+  };
+
+  const handleAddStaff = async () => {
+    setLoading(true);
+    try {
+      await axios.post("http://localhost:8000/api/register-user/", newStaff);
+      setAddStaffDialogOpen(false);
+      setNewStaff({
+        name: "",
+        email: "",
+        mobile_number: "",
+        password: "",
+      });
+      handleViewMembers("staff"); // Refresh the staff list
+      setLoading(false);
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to add staff");
+      setLoading(false);
+    }
+  };
+
+  const handleDrawerOpen = () => {
+    setOpen(true);
+  };
+
+  const handleDrawerClose = () => {
+    setOpen(false);
   };
 
   if (loading) {
     return (
-      <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+      <Container
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "80vh",
+        }}
+      >
         <CircularProgress />
       </Container>
     );
   }
 
   if (error) {
-    return <Container><Alert severity="error">{error}</Alert></Container>;
+    return (
+      <Container>
+        <Alert severity="error">{error}</Alert>
+      </Container>
+    );
   }
 
   return (
-    <Container maxWidth="md">
-      <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Welcome, Super Admin!
-        </Typography>
-        <Typography variant="h6" color="textSecondary" gutterBottom>
-          This is the super admin dashboard.
-        </Typography>
-        {counts && (
-          <Box sx={{ display: 'flex', gap: 4, mb: 4 }}>
-            <Paper elevation={3} sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="h6">Registered Students</Typography>
-              <Typography variant="h4" color="primary">{counts.student_count}</Typography>
-            </Paper>
-            <Paper elevation={3} sx={{ p: 2, textAlign: 'center' }}>
-              <Typography variant="h6">Registered Staff</Typography>
-              <Typography variant="h4" color="secondary">{counts.staff_count}</Typography>
-            </Paper>
+    <Box sx={{ display: "flex" }}>
+      <CssBaseline />
+      <AppBar position="fixed" open={open}>
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            onClick={handleDrawerOpen}
+            edge="start"
+            sx={{ mr: 2, ...(open && { display: "none" }) }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6" noWrap component="div">
+            Super Admin Dashboard
+          </Typography>
+        </Toolbar>
+      </AppBar>
+      <Drawer
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+          },
+        }}
+        variant="persistent"
+        anchor="left"
+        open={open}
+      >
+        <Toolbar>
+          <IconButton onClick={handleDrawerClose}>
+            <ChevronLeftIcon />
+          </IconButton>
+        </Toolbar>
+        <Divider />
+        <List>
+          <ListItem button onClick={() => handleViewMembers("student")}>
+            <ListItemText primary="View Students" />
+          </ListItem>
+          <ListItem button onClick={() => handleViewMembers("staff")}>
+            <ListItemText primary="View Staff" />
+          </ListItem>
+          <ListItem button onClick={() => setAddStaffDialogOpen(true)}>
+            <ListItemText primary="Add Staff" />
+          </ListItem>
+        </List>
+      </Drawer>
+      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+        <Toolbar />
+        <Container maxWidth="md">
+          <Box
+            sx={{
+              mt: 4,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            <Typography variant="h4" component="h1" gutterBottom>
+              Welcome, Super Admin!
+            </Typography>
+            <Typography variant="h6" color="textSecondary" gutterBottom>
+              This is the super admin dashboard.
+            </Typography>
+            {counts && (
+              <Box sx={{ display: "flex", gap: 4, mb: 4 }}>
+                <Paper elevation={3} sx={{ p: 2, textAlign: "center" }}>
+                  <Typography variant="h6">Registered Students</Typography>
+                  <Typography variant="h4" color="primary">
+                    {counts.student_count}
+                  </Typography>
+                </Paper>
+                <Paper elevation={3} sx={{ p: 2, textAlign: "center" }}>
+                  <Typography variant="h6">Registered Staff</Typography>
+                  <Typography variant="h4" color="secondary">
+                    {counts.staff_count}
+                  </Typography>
+                </Paper>
+                <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    onClick={handleLogout}
+                    sx={{ minWidth: 200 }}
+                  >
+                    Logout
+                  </Button>
+                </Box>
+              </Box>
+            )}
           </Box>
-        )}
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button variant="contained" color="primary" onClick={() => handleViewMembers('student')}>
-            View Students
-          </Button>
-          <Button variant="contained" color="primary" onClick={() => handleViewMembers('staff')}>
-            View Staff
-          </Button>
-        </Box>
+        </Container>
       </Box>
 
-      <Dialog open={studentDialogOpen} onClose={() => handleCloseDialog('student')} fullWidth maxWidth="md">
+      <Dialog
+        open={studentDialogOpen}
+        onClose={() => handleCloseDialog("student")}
+        fullWidth
+        maxWidth="md"
+      >
         <DialogTitle>Registered Students</DialogTitle>
         <DialogContent>
           {studentMembers && (
@@ -128,7 +320,6 @@ const SuperAdminHome = () => {
                     <TableCell>Department</TableCell>
                     <TableCell>Date of Birth</TableCell>
                     <TableCell>Gender</TableCell>
- 
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -155,7 +346,12 @@ const SuperAdminHome = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={staffDialogOpen} onClose={() => handleCloseDialog('staff')} fullWidth maxWidth="md">
+      <Dialog
+        open={staffDialogOpen}
+        onClose={() => handleCloseDialog("staff")}
+        fullWidth
+        maxWidth="md"
+      >
         <DialogTitle>Registered Staff</DialogTitle>
         <DialogContent>
           {staffMembers && (
@@ -168,6 +364,7 @@ const SuperAdminHome = () => {
                     <TableCell>Email</TableCell>
                     <TableCell>Mobile Number</TableCell>
                     <TableCell>User Type</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -178,6 +375,15 @@ const SuperAdminHome = () => {
                       <TableCell>{staff.email}</TableCell>
                       <TableCell>{staff.mobile_number}</TableCell>
                       <TableCell>{staff.user_type}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          onClick={() => handleAssignStaff(staff)}
+                        >
+                          Assign
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -186,8 +392,94 @@ const SuperAdminHome = () => {
           )}
         </DialogContent>
       </Dialog>
-    </Container>
+
+      <Dialog
+        open={assignDialogOpen}
+        onClose={() => handleCloseDialog("assign")}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Assign Staff to Department</DialogTitle>
+        <DialogContent>
+          <TextField
+            select
+            label="Department"
+            value={department}
+            onChange={handleDepartmentChange}
+            fullWidth
+            variant="outlined"
+            margin="normal"
+          >
+            <MenuItem value="IT">IT</MenuItem>
+            <MenuItem value="AD">AD</MenuItem>
+            <MenuItem value="CSE">CSE</MenuItem>
+            <MenuItem value="IOT">IOT</MenuItem>
+          </TextField>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleAssign}
+            disabled={!department}
+          >
+            Assign
+          </Button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={addStaffDialogOpen}
+        onClose={() => handleCloseDialog("addStaff")}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Add Staff</DialogTitle>
+        <DialogContent>
+          <TextField
+            label="Name"
+            value={newStaff.name}
+            onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
+            fullWidth
+            variant="outlined"
+            margin="normal"
+          />
+          <TextField
+            label="Email"
+            value={newStaff.email}
+            onChange={(e) =>
+              setNewStaff({ ...newStaff, email: e.target.value })
+            }
+            fullWidth
+            variant="outlined"
+            margin="normal"
+          />
+          <TextField
+            label="Mobile Number"
+            value={newStaff.mobile_number}
+            onChange={(e) =>
+              setNewStaff({ ...newStaff, mobile_number: e.target.value })
+            }
+            fullWidth
+            variant="outlined"
+            margin="normal"
+          />
+          <TextField
+            label="Password"
+            type="password"
+            value={newStaff.password}
+            onChange={(e) =>
+              setNewStaff({ ...newStaff, password: e.target.value })
+            }
+            fullWidth
+            variant="outlined"
+            margin="normal"
+          />
+          <Button variant="contained" color="primary" onClick={handleAddStaff}>
+            Add Staff
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </Box>
   );
 };
 
-export default SuperAdminHome; 
+export default SuperAdminHome;
