@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from django.contrib.auth.hashers import check_password
 from django.core.mail import send_mail, get_connection
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from django.conf import settings
 from pymongo.errors import ConnectionFailure, OperationFailure
 from .mongodb import users_collection, db ,admins_collection 
@@ -980,5 +980,58 @@ def get_all_students(request):
         logger.error(f"Error fetching all students: {str(e)}", exc_info=True)
         return Response(
             {"error": "Failed to fetch all students"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+def mark_attendance(request):
+    attendance_records = request.data.get("attendanceRecords") # Get attendance records from request body
+    admin_user_info = request.user # Get admin user info from request (assuming you have authentication setup)
+
+    if not attendance_records:
+        return Response(
+            {"error": "Attendance records are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        attendance_collection = db.attendance # Get attendance collection
+
+        for record in attendance_records:
+            student_id = record.get("studentId")
+            status_ = record.get("status") # Use status_ to avoid shadowing built-in name
+            date_str = record.get("date")
+
+            if not all([student_id, status_, date_str]):
+                logger.warning(f"Incomplete attendance record: {record}")
+                continue # Skip incomplete records - or handle error as needed
+
+            try:
+                attendance_date = datetime.strptime(date_str, "%Y-%m-%d").date() # Parse date string to date object
+            except ValueError:
+                logger.error(f"Invalid date format: {date_str} for student ID: {student_id}")
+                continue # Skip if date is invalid
+
+            # Assuming admin_user_info is available and contains admin's _id
+            admin_id = admin_user_info.id if admin_user_info else "unknown_admin_id" # Replace with actual admin ID retrieval
+
+            attendance_document = {
+                "student_id": student_id,
+                "date": attendance_date,
+                "status": status_,
+                "marked_by_admin_id": admin_id, # Record admin who marked attendance
+                "timestamp": datetime.now() # Add timestamp for when attendance was marked
+            }
+            attendance_collection.insert_one(attendance_document) # Insert attendance record
+
+        return Response(
+            {"message": "Attendance marked successfully"}, status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        logger.error(f"Error marking attendance: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "Failed to mark attendance"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

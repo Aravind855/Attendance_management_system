@@ -39,13 +39,13 @@ import axios from 'axios';
 const AdminHome = () => {
     const [admin, setAdmin] = useState(null);
     const navigate = useNavigate();
-    const [selectedAction, setSelectedAction] = useState(null); // State to track selected action in sidebar
+    const [selectedAction, setSelectedAction] = useState('mark_attendance'); // Default action is 'mark_attendance'
     const [numStudentsToAdd, setNumStudentsToAdd] = useState(1);
     const [studentData, setStudentData] = useState([]);
     const [addStudentStatus, setAddStudentStatus] = useState(null);
     const [departmentStudents, setDepartmentStudents] = useState([]);
     const [allStudents, setAllStudents] = useState([]);
-    const [attendanceData, setAttendanceData] = useState({}); // State to hold attendance status for each student
+    const [attendanceData, setAttendanceData] = useState({});
     const [attendanceSubmitStatus, setAttendanceSubmitStatus] = useState(null);
 
     useEffect(() => {
@@ -61,6 +61,7 @@ const AdminHome = () => {
             return;
         }
         setAdmin(user);
+        console.log("Admin Department:", user.department);
         fetchDepartmentStudents(user.department);
     }, [navigate]);
 
@@ -78,9 +79,9 @@ const AdminHome = () => {
         navigate('/login');
     };
 
-    const handleSidebarItemClick = (action) => {
+    const handleActionClick = (action) => {
         setSelectedAction(action);
-        setAddStudentStatus(null); // Reset status when action changes
+        setAttendanceSubmitStatus(null); // Reset status when action changes
     };
 
     const handleNumStudentsChange = (event) => {
@@ -118,8 +119,11 @@ const AdminHome = () => {
 
     const fetchDepartmentStudents = async (department) => {
         try {
+            console.log("Fetching students for department:", department);
             const response = await axios.get('/api/get-department-students/', { params: { department } });
+            console.log("API Response (get-department-students):", response.data);
             setDepartmentStudents(response.data.students);
+            console.log("Department Students State:", response.data.students);
         } catch (error) {
             console.error("Error fetching department students:", error);
         }
@@ -134,36 +138,26 @@ const AdminHome = () => {
         }
     };
 
-    const handleActionClick = (action) => {
-        setSelectedAction(action);
-    };
-
-    const handleAttendanceChange = (studentId) => {
-        setAttendanceData(prevData => {
-            const currentStatus = prevData[studentId];
-            const newStatus = currentStatus === 'Present' ? 'Absent' : 'Present'; // Toggle between Present and Absent
-            return {
-                ...prevData,
-                [studentId]: newStatus,
-            };
-        });
+    const handleAttendanceChange = (studentId, status) => {
+        setAttendanceData(prevData => ({
+            ...prevData,
+            [studentId]: status,
+        }));
     };
 
     const handleSubmitAttendance = async () => {
         setAttendanceSubmitStatus({ status: 'loading', message: 'Submitting attendance...' });
         try {
-            // Prepare attendance data for backend
             const attendanceRecords = Object.keys(attendanceData).map(studentId => ({
                 studentId: studentId,
                 status: attendanceData[studentId],
-                date: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
+                date: new Date().toISOString().split('T')[0]
             }));
 
             const response = await axios.post('/api/mark-attendance/', { attendanceRecords: attendanceRecords });
             if (response.status === 200) {
                 setAttendanceSubmitStatus({ status: 'success', message: 'Attendance submitted successfully!' });
-                // Reset attendanceData after successful submission if needed
-                setAttendanceData({});
+                setAttendanceData({}); // Clear attendance data after submit
             } else {
                 setAttendanceSubmitStatus({ status: 'error', message: 'Failed to submit attendance.' });
             }
@@ -173,7 +167,57 @@ const AdminHome = () => {
         }
     };
 
+    const renderSidebar = () => (
+        <Paper sx={{ p: 2, height: '100%' }}>
+            <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                Admin Actions
+            </Typography>
+            <List>
+                <ListItem disablePadding>
+                    <ListItemButton selected={selectedAction === 'mark_attendance'} onClick={() => handleActionClick('mark_attendance')}>
+                        <ListItemIcon><EventAvailableIcon /></ListItemIcon>
+                        <ListItemText primary="Mark Attendance" />
+                    </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                    <ListItemButton selected={selectedAction === 'students'} onClick={() => handleActionClick('students')}>
+                        <ListItemIcon><PeopleIcon /></ListItemIcon>
+                        <ListItemText primary="Department Students" />
+                    </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                    <ListItemButton selected={selectedAction === 'all_students'} onClick={() => { handleActionClick('all_students'); fetchAllStudents(); }}>
+                        <ListItemIcon><ListIcon /></ListItemIcon>
+                        <ListItemText primary="All Students" />
+                    </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                    <ListItemButton selected={selectedAction === 'add_students'} onClick={() => handleActionClick('add_students')}>
+                        <ListItemIcon><AddCircleIcon /></ListItemIcon>
+                        <ListItemText primary="Add Students" />
+                    </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                    <ListItemButton selected={selectedAction === 'settings'} onClick={() => handleActionClick('settings')}>
+                        <ListItemIcon><SettingsIcon /></ListItemIcon>
+                        <ListItemText primary="System Settings" />
+                    </ListItemButton>
+                </ListItem>
+                <ListItem disablePadding>
+                    <ListItemButton selected={selectedAction === 'reports'} onClick={() => handleActionClick('reports')}>
+                        <ListItemIcon><ReportIcon /></ListItemIcon>
+                        <ListItemText primary="View Reports" />
+                    </ListItemButton>
+                </ListItem>
+            </List>
+        </Paper>
+    );
+
     const renderMainContent = () => {
+        const currentDate = new Date();
+        const formattedDate = currentDate.toLocaleDateString();
+        const formattedTime = currentDate.toLocaleTimeString();
+
         switch (selectedAction) {
             case 'students':
                 return (
@@ -193,7 +237,7 @@ const AdminHome = () => {
                     <Paper sx={{ p: 2, mt: 2 }}>
                         <Typography variant="h6" gutterBottom>All Students</Typography>
                         <List>
-                            {allStudents.map((student) => (
+                            {departmentStudents.map((student) => (
                                 <ListItem key={student._id}>
                                     <ListItemText primary={student.name} secondary={student.email} />
                                 </ListItem>
@@ -267,9 +311,11 @@ const AdminHome = () => {
             case 'reports':
                 return <Paper sx={{ p: 2, mt: 2 }}> <Typography>Reports Content</Typography> </Paper>;
             case 'mark_attendance':
+            default: // Default case is now 'mark_attendance'
                 return (
                     <Paper sx={{ p: 2, mt: 2 }}>
                         <Typography variant="h6" gutterBottom>Mark Attendance - {admin.department} Department</Typography>
+                        <Typography variant="subtitle1" gutterBottom>Date: {formattedDate}, Time: {formattedTime}</Typography>
                         <TableContainer component={Paper}>
                             <Table aria-label="attendance table">
                                 <TableHead>
@@ -277,28 +323,33 @@ const AdminHome = () => {
                                         <TableCell><b>Student Name</b></TableCell>
                                         <TableCell align="right"><b>Registration No.</b></TableCell>
                                         <TableCell align="center"><b>Attendance Status</b></TableCell>
+                                        <TableCell align="center"><b>Actions</b></TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {departmentStudents.map((student) => (
                                         <TableRow key={student._id}>
                                             <TableCell component="th" scope="row">
-                                                <Button
-                                                    onClick={() => handleAttendanceChange(student._id)}
-                                                    style={{ textDecoration: 'none', color: 'inherit' }}
-                                                >
-                                                    {student.name}
-                                                </Button>
+                                                {student.name}
                                             </TableCell>
                                             <TableCell align="right">{student.registration_no}</TableCell>
                                             <TableCell align="center">
-                                                {attendanceData[student._id] === 'Present' ? (
-                                                    <Typography color="success">Present</Typography>
-                                                ) : attendanceData[student._id] === 'Absent' ? (
-                                                    <Typography color="error">Absent</Typography>
-                                                ) : (
-                                                    <Typography>-</Typography>
-                                                )}
+                                                {attendanceData[student._id] || '-'}
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <FormControl component="fieldset">
+                                                    <RadioGroup
+                                                        row
+                                                        aria-label="attendance"
+                                                        name={`attendance-${student._id}`}
+                                                        value={attendanceData[student._id] || ''}
+                                                        onChange={(e) => handleAttendanceChange(student._id, e.target.value)}
+                                                    >
+                                                        <FormControlLabel value="Present" control={<Radio />} label="Present" />
+                                                        <FormControlLabel value="Absent" control={<Radio />} label="Absent" />
+                                                        <FormControlLabel value="Late" control={<Radio />} label="Late" />
+                                                    </RadioGroup>
+                                                </FormControl>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -320,124 +371,34 @@ const AdminHome = () => {
                         )}
                     </Paper>
                 );
-            default:
-                return (
-                    <Paper sx={{ p: 3, mb: 3 }}>
-                        <Typography variant="h6" gutterBottom>
-                            Welcome to the Staff Dashboard. Select an action from the sidebar.
-                        </Typography>
-                    </Paper>
-                );
         }
     };
 
     if (!admin) return null;
 
     return (
-        <Container maxWidth="xl" sx={{ display: 'flex', mt: 4 }}>
-            {/* Sidebar */}
-            <Paper sx={{ width: 240, mr: 3, p: 2, height: 'fit-content' }}>
-                <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-                    Admin Actions
-                </Typography>
-                <List>
-                    <ListItem disablePadding>
-                        <ListItemButton selected={selectedAction === 'students'} onClick={() => handleActionClick('students')}>
-                            <ListItemIcon>
-                                <PeopleIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Department Students" />
-                        </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                        <ListItemButton selected={selectedAction === 'all_students'} onClick={() => { handleActionClick('all_students'); fetchAllStudents(); }}>
-                            <ListItemIcon>
-                                <ListIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="All Students" />
-                        </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                        <ListItemButton selected={selectedAction === 'add_students'} onClick={() => handleActionClick('add_students')}>
-                            <ListItemIcon>
-                                <AddCircleIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Add Students" />
-                        </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                        <ListItemButton selected={selectedAction === 'mark_attendance'} onClick={() => handleActionClick('mark_attendance')}>
-                            <ListItemIcon>
-                                <EventAvailableIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Mark Attendance" />
-                        </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                        <ListItemButton selected={selectedAction === 'settings'} onClick={() => handleActionClick('settings')}>
-                            <ListItemIcon>
-                                <SettingsIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="System Settings" />
-                        </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                        <ListItemButton selected={selectedAction === 'reports'} onClick={() => handleActionClick('reports')}>
-                            <ListItemIcon>
-                                <ReportIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="View Reports" />
-                        </ListItemButton>
-                    </ListItem>
-                </List>
-            </Paper>
-
-            {/* Main Content Area */}
-            <Box sx={{ flexGrow: 1 }}>
+        <Box sx={{ display: 'flex', height: '100vh' }}>
+            <Box sx={{ width: 240, height: '100%', p: 2 }}>
+                {renderSidebar()}
+                <Button variant="contained" color="error" onClick={handleLogout} sx={{ mt: 2 }}>Logout</Button>
+            </Box>
+            <Box sx={{ flexGrow: 1, p: 3, bgcolor: '#f4f6f8' }}>
                 <Paper sx={{ p: 3, mb: 3 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                         <Typography variant="h4" component="h1">
                             Staff Dashboard
                         </Typography>
-                        <Button variant="contained" color="error" onClick={handleLogout}>
-                            Logout
-                        </Button>
+                        <Typography variant="h6">
+                            Welcome, {admin ? admin.name : 'Admin'}!
+                        </Typography>
                     </Box>
-                    
-                    <Typography variant="h6" gutterBottom>
-                        Welcome, {admin.name}!
+                    <Typography variant="subtitle1">
+                        Department: {admin ? admin.department : 'Not Assigned'}
                     </Typography>
                 </Paper>
-
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={4}>
-                        <Paper sx={{ p: 3, textAlign: 'center' }}>
-                            <Typography variant="h6">Total Students</Typography>
-                            <Typography variant="h4">0</Typography>
-                            <Button variant="text" sx={{ mt: 2 }}>View All Students</Button>
-                        </Paper>
-                    </Grid>
-
-                    <Grid item xs={12} md={4}>
-                        <Paper sx={{ p: 3, textAlign: 'center' }}>
-                            <Typography variant="h6">New Students Today</Typography>
-                            <Typography variant="h4">0</Typography>
-                            <Button variant="text" sx={{ mt: 2 }}>View Details</Button>
-                        </Paper>
-                    </Grid>
-
-                    <Grid item xs={12} md={4}>
-                        <Paper sx={{ p: 3, textAlign: 'center' }}>
-                            <Typography variant="h6">Active Students</Typography>
-                            <Typography variant="h4">0</Typography>
-                            <Button variant="text" sx={{ mt: 2 }}>View Active Students</Button>
-                        </Paper>
-                    </Grid>
-                </Grid>
-
                 {renderMainContent()}
             </Box>
-        </Container>
+        </Box>
     );
 };
 

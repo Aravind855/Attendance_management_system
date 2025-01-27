@@ -47,4 +47,9 @@ urlpatterns = [
         views.get_all_students,
         name="get_all_students",
     ),
+    path(
+        "api/mark-attendance/",
+        views.mark_attendance,
+        name="mark_attendance",
+    ),
 ]
