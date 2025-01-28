@@ -12,6 +12,7 @@ import {
   Legend,
 } from "recharts";
 import axios from "axios";
+import { useLocation } from "react-router-dom";
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
@@ -20,20 +21,22 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
 }));
 
 const ViewReports = () => {
-  const [selectedDate, setSelectedDate] = useState(null);
   const [attendanceData, setAttendanceData] = useState([]);
   const [error, setError] = useState(null);
+  const location = useLocation();
 
-  const handleDateChange = (date) => {
-    setSelectedDate(date);
-  };
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const date = queryParams.get("date");
+    if (date) {
+      fetchAttendanceReport(date);
+    }
+  }, [location]);
 
-  const fetchAttendanceReport = async () => {
-    if (!selectedDate) return;
-
+  const fetchAttendanceReport = async (date) => {
     try {
       const response = await axios.get("/api/get-attendance-report/", {
-        params: { date: selectedDate.toISOString().split("T")[0] }, // Format date to YYYY-MM-DD
+        params: { date },
       });
       setAttendanceData(response.data);
       setError(null);
@@ -46,34 +49,12 @@ const ViewReports = () => {
   return (
     <StyledPaper>
       <Typography variant="h5" gutterBottom>
-        View Attendance Report
+        Attendance Report
       </Typography>
-      <Grid container spacing={2} alignItems="center">
-        <Grid item xs={12} sm={6}>
-          <DatePicker
-            label="Select Date"
-            value={selectedDate}
-            onChange={handleDateChange}
-            renderInput={(params) => <TextField {...params} fullWidth />}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={fetchAttendanceReport}
-            disabled={!selectedDate}
-          >
-            Fetch Report
-          </Button>
-        </Grid>
-      </Grid>
       {error && <Typography color="error">{error}</Typography>}
       {attendanceData.length > 0 && (
         <Box mt={3}>
-          <Typography variant="h6">
-            Attendance Summary for {selectedDate?.toLocaleDateString()}
-          </Typography>
+          <Typography variant="h6">Attendance Summary</Typography>
           <BarChart width={500} height={300} data={attendanceData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="status" />

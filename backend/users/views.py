@@ -1134,33 +1134,47 @@ def mark_attendance(request):
 
 @api_view(["GET"])
 def get_attendance_report(request):
-    date_str = request.query_params.get("date")
-    if not date_str:
-        return Response(
-            {"error": "Date is required"}, status=status.HTTP_400_BAD_REQUEST
-        )
+     date_str = request.query_params.get("date")
+     if not date_str:
+         return Response({"error": "Date is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+     try:
+         # Convert the date string to a datetime object at the start of the day
+         date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+         start_of_day = datetime.combine(date_obj, datetime.min.time())
+
+         end_of_day = datetime.combine(date_obj, datetime.max.time())
+
+
+         # Use the datetime object for querying
+         attendance_records = list(db.attendance.find(
+            {"date": {"$gte": start_of_day, "$lte": end_of_day }}
+         ))
+
+
+         # Count attendance status
+         present_count = sum(1 for record in attendance_records if record['status'] == 'Present')
+         absent_count = sum(1 for record in attendance_records if record['status'] == 'Absent')
+         late_count = sum(1 for record in attendance_records if record['status'] == 'Late')
+
+         attendance_summary = [
+             {"status": "Present", "count": present_count},
+             {"status": "Absent", "count": absent_count},
+             {"status": "Late", "count": late_count},
+         ]
+
+         return Response(attendance_summary, status=status.HTTP_200_OK)
+
+     except Exception as e:
+         logger.error(f"Error fetching attendance report: {str(e)}", exc_info=True)
+         return Response({"error": "Failed to fetch attendance report"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+     
+@api_view(["GET"])
+def get_attendance_dates(request):
     try:
-        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-        attendance_records = list(db.attendance.find({"date": date_obj}))
-       
-        present_count = sum(
-            1 for record in attendance_records if record["status"] == "Present"
-        )
-        absent_count = sum(
-            1 for record in attendance_records if record["status"] == "Absent"
-        )
-        late_count = sum(
-            1 for record in attendance_records if record["status"] == "Late"
-        )
-        attendance_summary = [
-            {"status": "Present", "count": present_count},
-            {"status": "Absent", "count": absent_count},
-            {"status": "Late", "count": late_count},
-        ]
-        return Response(attendance_summary, status=status.HTTP_200_OK)
+        attendance_dates = db.attendance.distinct("date")
+        attendance_dates = [date.strftime("%Y-%m-%d") for date in attendance_dates]
+        return Response({"dates": attendance_dates}, status=status.HTTP_200_OK)
     except Exception as e:
-        logger.error(f"Error fetching attendance report: {str(e)}", exc_info=True)
-        return Response(
-            {"error": "Failed to fetch attendance report"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+        logger.error(f"Error fetching attendance dates: {str(e)}", exc_info=True)
+        return Response({"error": "Failed to fetch attendance dates"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

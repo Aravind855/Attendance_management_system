@@ -76,4 +76,9 @@ urlpatterns = [
         views.get_attendance_report,
         name="get_attendance_report",
     ),
+    path(
+        "api/get-attendance-dates/",
+        views.get_attendance_dates,
+        name="get_attendance_dates",
+    ),
 ]
