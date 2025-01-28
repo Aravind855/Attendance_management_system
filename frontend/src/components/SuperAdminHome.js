@@ -384,10 +384,12 @@ const SuperAdminHome = () => {
                   <TableRow>
                     <TableCell>ID</TableCell>
                     <TableCell>Name</TableCell>
+                    <TableCell>Registration No</TableCell>
                     <TableCell>Email</TableCell>
                     <TableCell>Academic Year</TableCell>
                     <TableCell>Department</TableCell>
                     <TableCell>Gender</TableCell>
+                    <TableCell>DOB</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -395,10 +397,12 @@ const SuperAdminHome = () => {
                     <TableRow key={student._id}>
                       <TableCell>{student._id}</TableCell>
                       <TableCell>{student.name}</TableCell>
+                      <TableCell>{student.registration_no}</TableCell>
                       <TableCell>{student.email}</TableCell>
                       <TableCell>{student.academic_year}</TableCell>
                       <TableCell>{student.department}</TableCell>
                       <TableCell>{student.gender}</TableCell>
+                      <TableCell>{student.dob}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

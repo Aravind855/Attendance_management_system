@@ -295,18 +295,15 @@ def login_user(request):
 
     if user_type == "Superadmin":
         admin = db.admin.find_one({"email": email})
-        if admin and check_password(password, admin["password"]):
+        if admin and (password == admin["password"]):
             logger.info("Super admin login successful")
             return Response(
                 {
                     "message": "Login successful",
-                    "id": "superadmin",
-                    "email": "aravindsiva190@gmail.com",
+                    "id": str(admin["_id"]),
+                    "email": admin["email"],
                     "user_type": "Superadmin",
                     "is_student": False,
-                    "name": "Super Admin",
-                    "mobile_number": "",
-                    "department": None,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -317,7 +314,7 @@ def login_user(request):
             )
     elif user_type == "admin":
         admin = db.staff.find_one({"email": email})
-        
+
         if admin and check_password(password, admin["password"]):
             logger.info("Admin login successful for user: %s", email)
             return Response(
@@ -338,7 +335,7 @@ def login_user(request):
                 {"error": "Invalid Staff credentials"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-    
+
     elif user_type == "user":
         if not email.endswith("@snsce.ac.in"):
             return Response(
@@ -746,22 +743,27 @@ def get_registered_counts(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-@api_view(['GET'])
+
+@api_view(["GET"])
 def get_registered_members(request):
     try:
-        students = list(db.students.find({}, {'_id': 1, 'email': 1, 'name': 1}))
-        staffs = list(users_collection.find({}, {'_id': 1, 'email': 1, 'name': 1})) + list(admins_collection.find({}, {'_id': 1, 'email': 1, 'name': 1}))
-        
-        # Convert ObjectIds to strings
-        for student in students:
-            student['_id'] = str(student['_id'])
-        for staff in staffs:
-            staff['_id'] = str(staff['_id'])
-        
-        return Response({
-            'students': students,
-            'staffs': staffs
-        })
+        user_type = request.query_params.get("user_type", None)
+
+        if user_type == "student":
+            students = list(db.students.find({}, {}))
+            for student in students:
+                student["_id"] = str(student["_id"])
+            
+            return Response({"members": students, "user_type": "student"})
+        elif user_type == "staff":
+            staffs = list(db.staff.find({}, {}))
+            for staff in staffs:
+                staff["_id"] = str(staff["_id"])
+            return Response({"members": staffs, "user_type": "staff"})
+        else:
+            return Response(
+                {"error": "Invalid user type"}, status=status.HTTP_400_BAD_REQUEST
+            )
     except Exception as e:
         logger.error(f"Error fetching registered members: {str(e)}", exc_info=True)
         return Response(
@@ -868,6 +870,7 @@ def check_unassigned_grades(request):
                 {
                     "error": f'Unassigned departments: {", ".join(unassigned_departments)}'
                 },
+                
                 status=status.HTTP_200_OK,
             )
         else:
