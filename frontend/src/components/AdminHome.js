@@ -27,6 +27,7 @@ import {
     TableHead,
     TableRow,
 } from '@mui/material';
+import { styled } from '@mui/system';
 import PeopleIcon from '@mui/icons-material/People';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ReportIcon from '@mui/icons-material/Report';
@@ -35,6 +36,29 @@ import ListIcon from '@mui/icons-material/List';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+
+// Styled components for enhanced UI
+const StyledPaper = styled(Paper)(({ theme }) => ({
+    backgroundColor: '#ffffff',
+    borderRadius: '12px',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+    transition: '0.3s',
+    '&:hover': {
+        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.2)',
+    },
+}));
+
+const StyledButton = styled(Button)(({ theme }) => ({
+    backgroundColor: '#007BFF',
+    color: '#fff',
+    '&:hover': {
+        backgroundColor: '#0056b3',
+    },
+    borderRadius: '8px',
+    padding: '10px 20px',
+    transition: '0.3s',
+}));
 
 const AdminHome = () => {
     const [admin, setAdmin] = useState(null);
@@ -50,6 +74,8 @@ const AdminHome = () => {
     const [departmentFilter, setDepartmentFilter] = useState('');
     const [academicYearFilter, setAcademicYearFilter] = useState('');
     const [attendanceAction, setAttendanceAction] = useState('Present'); // Default attendance action
+    const [attendanceChartData, setAttendanceChartData] = useState(null);
+    const [attendanceError, setAttendanceError] = useState(null);
 
     useEffect(() => {
         const userInfo = localStorage.getItem('userInfo');
@@ -86,6 +112,8 @@ const AdminHome = () => {
     const handleActionClick = (action) => {
         setSelectedAction(action);
         setAttendanceSubmitStatus(null); // Reset status when action changes
+        setAttendanceChartData(null);
+        setAttendanceError(null);
     };
 
     const handleNumStudentsChange = (event) => {
@@ -151,6 +179,15 @@ const AdminHome = () => {
 
     const handleSubmitAttendance = async () => {
         setAttendanceSubmitStatus({ status: 'loading', message: 'Submitting attendance...' });
+        setAttendanceError(null);
+        setAttendanceChartData(null);
+
+        if (Object.keys(attendanceData).length !== departmentStudents.length) {
+            setAttendanceSubmitStatus({ status: 'error', message: 'Attendance marking incomplete.' });
+            setAttendanceError('Please mark attendance status for all students.');
+            return;
+        }
+
         try {
             const attendanceRecords = Object.keys(attendanceData).map(studentId => ({
                 studentId: studentId,
@@ -161,7 +198,17 @@ const AdminHome = () => {
             const response = await axios.post('/api/mark-attendance/', { attendanceRecords: attendanceRecords });
             if (response.status === 200) {
                 setAttendanceSubmitStatus({ status: 'success', message: 'Attendance submitted successfully!' });
-                setAttendanceData({}); // Clear attendance data after submit
+                setAttendanceData({});
+
+                const presentCount = attendanceRecords.filter(record => record.status === 'Present').length;
+                const absentCount = attendanceRecords.filter(record => record.status === 'Absent').length;
+                const lateCount = attendanceRecords.filter(record => record.status === 'Late').length;
+
+                setAttendanceChartData([
+                    { name: 'Present', count: presentCount },
+                    { name: 'Absent', count: absentCount },
+                    { name: 'Late', count: lateCount },
+                ]);
             } else {
                 setAttendanceSubmitStatus({ status: 'error', message: 'Failed to submit attendance.' });
             }
@@ -172,8 +219,8 @@ const AdminHome = () => {
     };
 
     const renderSidebar = () => (
-        <Paper sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+        <StyledPaper sx={{ p: 2, height: '100%' }}>
+            <Typography variant="h6" gutterBottom sx={{ mb: 2, color: '#007BFF' }}>
                 Admin Actions
             </Typography>
             <List>
@@ -214,7 +261,7 @@ const AdminHome = () => {
                     </ListItemButton>
                 </ListItem>
             </List>
-        </Paper>
+        </StyledPaper>
     );
 
     const renderMainContent = () => {
@@ -225,7 +272,7 @@ const AdminHome = () => {
         switch (selectedAction) {
             case 'students':
                 return (
-                    <Paper sx={{ p: 2, mt: 2 }}>
+                    <StyledPaper sx={{ p: 2, mt: 2 }}>
                         <Typography variant="h6" gutterBottom>Department Students ({admin.department})</Typography>
                         <FormControl fullWidth margin="normal">
                             <InputLabel id="department-filter-label">Filter by Department</InputLabel>
@@ -238,7 +285,7 @@ const AdminHome = () => {
                                 {/* Add other department options here */}
                             </Select>
                         </FormControl>
-                        <TableContainer component={Paper}>
+                        <TableContainer component={StyledPaper}>
                             <Table aria-label="department students table">
                                 <TableHead>
                                     <TableRow>
@@ -262,11 +309,11 @@ const AdminHome = () => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                    </Paper>
+                    </StyledPaper>
                 );
             case 'all_students':
                 return (
-                    <Paper sx={{ p: 2, mt: 2 }}>
+                    <StyledPaper sx={{ p: 2, mt: 2 }}>
                         <Typography variant="h6" gutterBottom>All Students</Typography>
                         <FormControl fullWidth margin="normal">
                             <InputLabel id="academic-year-filter-label">Filter by Academic Year</InputLabel>
@@ -279,7 +326,7 @@ const AdminHome = () => {
                                 {/* Add other academic year options here */}
                             </Select>
                         </FormControl>
-                        <TableContainer component={Paper}>
+                        <TableContainer component={StyledPaper}>
                             <Table aria-label="all students table">
                                 <TableHead>
                                     <TableRow>
@@ -317,11 +364,11 @@ const AdminHome = () => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                    </Paper>
+                    </StyledPaper>
                 );
             case 'add_students':
                 return (
-                    <Paper sx={{ p: 3, mt: 3 }}>
+                    <StyledPaper sx={{ p: 3, mt: 3 }}>
                         <Typography variant="h6" gutterBottom>
                             Add Students
                         </Typography>
@@ -342,7 +389,7 @@ const AdminHome = () => {
                             </FormControl>
 
                             {studentData.map((student, index) => (
-                                <Paper key={index} sx={{ p: 2, mt: 2 }}>
+                                <StyledPaper key={index} sx={{ p: 2, mt: 2 }}>
                                     <Typography variant="subtitle1">Student {index + 1}</Typography>
                                     <TextField
                                         fullWidth
@@ -361,7 +408,7 @@ const AdminHome = () => {
                                         onChange={(e) => handleStudentDataChange(index, 'email', e.target.value)}
                                         required
                                     />
-                                </Paper>
+                                </StyledPaper>
                             ))}
                             <Box sx={{ mt: 2 }}>
                                 <Button type="submit" variant="contained" color="primary">
@@ -378,31 +425,24 @@ const AdminHome = () => {
                                 )}
                             </Box>
                         </form>
-                    </Paper>
+                    </StyledPaper>
                 );
             case 'settings':
-                return <Paper sx={{ p: 2, mt: 2 }}> <Typography>Settings Content</Typography> </Paper>;
+                return <StyledPaper sx={{ p: 2, mt: 2 }}> <Typography>Settings Content</Typography> </StyledPaper>;
             case 'reports':
-                return <Paper sx={{ p: 2, mt: 2 }}> <Typography>Reports Content</Typography> </Paper>;
+                return <StyledPaper sx={{ p: 2, mt: 2 }}> <Typography>Reports Content</Typography> </StyledPaper>;
             case 'mark_attendance':
             default: // Default case is now 'mark_attendance'
                 return (
-                    <Paper sx={{ p: 2, mt: 2 }}>
+                    <StyledPaper sx={{ p: 2, mt: 2 }}>
                         <Typography variant="h6" gutterBottom>Mark Attendance - {admin.department} Department</Typography>
                         <Typography variant="subtitle1" gutterBottom>Date: {formattedDate}, Time: {formattedTime}</Typography>
-                        <FormControl fullWidth margin="normal">
-                            <InputLabel id="attendance-action-label">Attendance Action</InputLabel>
-                            <Select
-                                labelId="attendance-action-label"
-                                value={attendanceAction} // Add state for attendance action
-                                onChange={(e) => setAttendanceAction(e.target.value)} // Update state on change
-                            >
-                                <MenuItem value="Present">Present</MenuItem>
-                                <MenuItem value="Absent">Absent</MenuItem>
-                                <MenuItem value="Late">Late</MenuItem>
-                            </Select>
-                        </FormControl>
-                        <TableContainer component={Paper}>
+                        {attendanceError && (
+                            <Typography variant="body2" color="error" sx={{ mb: 1 }}>
+                                {attendanceError}
+                            </Typography>
+                        )}
+                        <TableContainer component={StyledPaper}>
                             <Table aria-label="attendance table">
                                 <TableHead>
                                     <TableRow>
@@ -443,9 +483,9 @@ const AdminHome = () => {
                             </Table>
                         </TableContainer>
 
-                        <Button variant="contained" color="primary" onClick={handleSubmitAttendance} sx={{ mt: 2 }}>
+                        <StyledButton variant="contained" onClick={handleSubmitAttendance} sx={{ mt: 2 }}>
                             Submit Attendance
-                        </Button>
+                        </StyledButton>
                         {attendanceSubmitStatus && (
                             <Typography
                                 variant="body2"
@@ -455,7 +495,21 @@ const AdminHome = () => {
                                 {attendanceSubmitStatus.message}
                             </Typography>
                         )}
-                    </Paper>
+
+                        {attendanceChartData && (
+                            <StyledPaper sx={{ p: 2, mt: 3 }}>
+                                <Typography variant="h6" gutterBottom>Attendance Summary</Typography>
+                                <BarChart width={500} height={300} data={attendanceChartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="count" fill="#8884d8" />
+                                </BarChart>
+                            </StyledPaper>
+                        )}
+                    </StyledPaper>
                 );
         }
     };
@@ -463,22 +517,22 @@ const AdminHome = () => {
     if (!admin) return null;
 
     return (
-        <Box sx={{ display: 'flex', height: '100vh' }}>
+        <Box sx={{ display: 'flex', height: '100vh', background: 'linear-gradient(to right, #f0f4f8, #e0e7ef)' }}>
             <Box sx={{ width: 240, height: '100%', p: 2 }}>
                 {renderSidebar()}
-                <Button variant="contained" color="error" onClick={handleLogout} sx={{ mt: 2 }}>Logout</Button>
+                <StyledButton variant="contained" color="error" onClick={handleLogout} sx={{ mt: 2 }}>Logout</StyledButton>
             </Box>
-            <Box sx={{ flexGrow: 1, p: 3, bgcolor: '#f4f6f8' }}>
-                <Paper sx={{ p: 3, mb: 3 }}>
+            <Box sx={{ flexGrow: 1, p: 3 }}>
+                <Paper sx={{ p: 3, mb: 3, borderRadius: '8px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                        <Typography variant="h4" component="h1">
+                        <Typography variant="h4" component="h1" sx={{ color: '#333' }}>
                             Staff Dashboard
                         </Typography>
-                        <Typography variant="h6">
+                        <Typography variant="h6" sx={{ color: '#555' }}>
                             Welcome, {admin ? admin.name : 'Admin'}!
                         </Typography>
                     </Box>
-                    <Typography variant="subtitle1">
+                    <Typography variant="subtitle1" sx={{ color: '#777' }}>
                         Department: {admin ? admin.department : 'Not Assigned'}
                     </Typography>
                 </Paper>

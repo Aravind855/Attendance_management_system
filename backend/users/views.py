@@ -986,8 +986,8 @@ def get_all_students(request):
 
 @api_view(["POST"])
 def mark_attendance(request):
-    attendance_records = request.data.get("attendanceRecords") # Get attendance records from request body
-    admin_user_info = request.user # Get admin user info from request (assuming you have authentication setup)
+    attendance_records = request.data.get("attendanceRecords")  # Get attendance records from request body
+    admin_user_info = request.user  # Get admin user info from request (assuming you have authentication setup)
 
     if not attendance_records:
         return Response(
@@ -996,34 +996,47 @@ def mark_attendance(request):
         )
 
     try:
-        attendance_collection = db.attendance # Get attendance collection
+        attendance_collection = db.attendance  # Get attendance collection
 
         for record in attendance_records:
             student_id = record.get("studentId")
-            status_ = record.get("status") # Use status_ to avoid shadowing built-in name
+            status_ = record.get("status")  # Use status_ to avoid shadowing built-in name
             date_str = record.get("date")
 
             if not all([student_id, status_, date_str]):
                 logger.warning(f"Incomplete attendance record: {record}")
-                continue # Skip incomplete records - or handle error as needed
+                continue  # Skip incomplete records - or handle error as needed
 
             try:
-                attendance_date = datetime.strptime(date_str, "%Y-%m-%d").date() # Parse date string to date object
+                # Convert date_str to datetime object
+                attendance_date = datetime.strptime(date_str, "%Y-%m-%d").date()  # Parse date string to date object
+                # Combine date with time (midnight)
+                attendance_datetime = datetime.combine(attendance_date, datetime.min.time())
             except ValueError:
                 logger.error(f"Invalid date format: {date_str} for student ID: {student_id}")
-                continue # Skip if date is invalid
+                continue  # Skip if date is invalid
+
+            # Check for existing attendance record
+            existing_record = attendance_collection.find_one({
+                "student_id": student_id,
+                "date": attendance_datetime
+            })
+
+            if existing_record:
+                logger.warning(f"Attendance record already exists for student ID: {student_id} on date: {attendance_datetime}")
+                continue  # Skip if record already exists
 
             # Assuming admin_user_info is available and contains admin's _id
-            admin_id = admin_user_info.id if admin_user_info else "unknown_admin_id" # Replace with actual admin ID retrieval
+            admin_id = admin_user_info.id if admin_user_info else "unknown_admin_id"  # Replace with actual admin ID retrieval
 
             attendance_document = {
                 "student_id": student_id,
-                "date": attendance_date,
+                "date": attendance_datetime,  # Use datetime object
                 "status": status_,
-                "marked_by_admin_id": admin_id, # Record admin who marked attendance
-                "timestamp": datetime.now() # Add timestamp for when attendance was marked
+                "marked_by_admin_id": admin_id,  # Record admin who marked attendance
+                "timestamp": datetime.now()  # Add timestamp for when attendance was marked
             }
-            attendance_collection.insert_one(attendance_document) # Insert attendance record
+            attendance_collection.insert_one(attendance_document)  # Insert attendance record
 
         return Response(
             {"message": "Attendance marked successfully"}, status=status.HTTP_200_OK
