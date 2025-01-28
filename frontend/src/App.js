@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import Login from './components/Login';
 import Signup from './components/Signup';
@@ -16,7 +16,6 @@ import SessionTimeout from './components/SessionTimeout';
 import ViewReports from './components/ViewReports';
 
 function App() {
-  // Get current path
   const path = window.location.pathname;
   const showNavBar = !['/user-home', '/admin-home', '/profile', '/superadmin-home'].includes(path);
 
