@@ -159,7 +159,7 @@ const SuperAdminHome = () => {
       setAssignDialogOpen(false);
       setSelectedStaff(null);
       setDepartment("");
-      handleViewMembers("staff"); // Refresh the staff list
+      handleViewMembers("staff"); 
       setLoading(false);
     } catch (err) {
       setError(
@@ -178,7 +178,7 @@ const SuperAdminHome = () => {
           staff_id: staffId,
         }
       );
-      handleViewMembers("staff"); // Refresh the staff list
+      handleViewMembers("staff"); 
       setLoading(false);
     } catch (err) {
       setError(
@@ -199,7 +199,7 @@ const SuperAdminHome = () => {
         password: "",
       });
       setFormErrors({});
-      handleViewMembers("staff"); // Refresh the staff list
+      handleViewMembers("staff"); 
       setLoading(false);
     } catch (err) {
       setError(err.response?.data?.error || "Failed to add staff");

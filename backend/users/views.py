@@ -784,7 +784,7 @@ def assign_staff_to_department(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check if a staff member is already assigned to the department
+        
         existing_staff = db.staff.find_one({"department": department})
         if existing_staff:
             return Response(
@@ -1022,7 +1022,7 @@ def get_department_students(request):
         students = list(db.students.find({"department": department_name}))
         for student in students:
             student["_id"] = str(student["_id"])
-            # Add any other fields you want to return
+            
         return Response({"students": students}, status=status.HTTP_200_OK)
 
     except Exception as e:
@@ -1054,10 +1054,10 @@ def get_all_students(request):
 def mark_attendance(request):
     attendance_records = request.data.get(
         "attendanceRecords"
-    )  # Get attendance records from request body
+    )  
     admin_user_info = (
         request.user
-    )  # Get admin user info from request (assuming you have authentication setup)
+    ) 
 
     if not attendance_records:
         return Response(
@@ -1066,25 +1066,25 @@ def mark_attendance(request):
         )
 
     try:
-        attendance_collection = db.attendance  # Get attendance collection
+        attendance_collection = db.attendance 
 
         for record in attendance_records:
             student_id = record.get("studentId")
             status_ = record.get(
                 "status"
-            )  # Use status_ to avoid shadowing built-in name
+            )  
             date_str = record.get("date")
 
             if not all([student_id, status_, date_str]):
                 logger.warning(f"Incomplete attendance record: {record}")
-                continue  # Skip incomplete records - or handle error as needed
+                continue  
 
             try:
-                # Convert date_str to datetime object
+                
                 attendance_date = datetime.strptime(
                     date_str, "%Y-%m-%d"
-                ).date()  # Parse date string to date object
-                # Combine date with time (midnight)
+                ).date()  
+                
                 attendance_datetime = datetime.combine(
                     attendance_date, datetime.min.time()
                 )
@@ -1092,9 +1092,9 @@ def mark_attendance(request):
                 logger.error(
                     f"Invalid date format: {date_str} for student ID: {student_id}"
                 )
-                continue  # Skip if date is invalid
+                continue  
 
-            # Check for existing attendance record
+            
             existing_record = attendance_collection.find_one(
                 {"student_id": student_id, "date": attendance_datetime}
             )
@@ -1103,24 +1103,23 @@ def mark_attendance(request):
                 logger.warning(
                     f"Attendance record already exists for student ID: {student_id} on date: {attendance_datetime}"
                 )
-                continue  # Skip if record already exists
+                continue  
 
-            # Assuming admin_user_info is available and contains admin's _id
+            
             admin_id = (
                 admin_user_info.id if admin_user_info else "unknown_admin_id"
-            )  # Replace with actual admin ID retrieval
+            )  
 
             attendance_document = {
                 "student_id": student_id,
-                "date": attendance_datetime,  # Use datetime object
+                "date": attendance_datetime,  
                 "status": status_,
-                "marked_by_admin_id": admin_id,  # Record admin who marked attendance
-                "timestamp": datetime.now(),  # Add timestamp for when attendance was marked
+                "marked_by_admin_id": admin_id, 
+                "timestamp": datetime.now(),  
             }
             attendance_collection.insert_one(
                 attendance_document
-            )  # Insert attendance record
-
+            ) 
         return Response(
             {"message": "Attendance marked successfully"}, status=status.HTTP_200_OK
         )
@@ -1143,7 +1142,7 @@ def get_attendance_report(request):
     try:
         date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
         attendance_records = list(db.attendance.find({"date": date_obj}))
-        # Count attendance status
+       
         present_count = sum(
             1 for record in attendance_records if record["status"] == "Present"
         )
