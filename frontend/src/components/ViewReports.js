@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Box, Typography, Paper, Button, TextField, Grid } from "@mui/material";
+import { Box, Typography, Paper } from "@mui/material";
 import { styled } from "@mui/system";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker"; // Import DatePicker from MUI
 import {
   BarChart,
   Bar,

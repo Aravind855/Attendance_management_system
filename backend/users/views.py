@@ -124,6 +124,17 @@ def verify_otp(request):
         except Exception as e:
             logger.error(f"Error in verify_otp: {str(e)}")
             return JsonResponse({'error': 'Internal server error'}, status=500)
+        
+def send_reset_email(email):
+    reset_link = f"http://localhost:3000/reset-password"
+    subject = 'Password Reset Request'
+    message = f'Click the following link to reset your password: {reset_link}'
+    try:
+        send_mail(subject, message, settings.EMAIL_HOST_USER, [email], fail_silently=False,)
+        return True
+    except Exception as e:
+        logger.error(f"Error sending reset email: {str(e)}")
+        return False
 
 @api_view(['POST'])
 def register_user(request):
@@ -346,9 +357,7 @@ def login_user(request):
         student = db.students.find_one({"email": email})
         if not student:
             student_data = {"email": email, "password": make_password(password)}
-            db.students.insert_one(student_data)
             student = db.students.find_one({"email": email})
-
         if not check_password(password, student["password"]):
             return Response(
                 {"error": "Invalid student credentials"},
@@ -396,9 +405,9 @@ def forgot_password(request):
                 {'error': 'Email not registered'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+        email_sent=send_reset_email(email)
         otp = CustomUser.generate_otp(email, 'user' if user else 'admin')
-        if not send_email_otp(email, otp):
+        if not email_sent:
             return Response(
                 {'error': 'Failed to send OTP'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -633,6 +642,8 @@ def verify_mobile_otp(request):
             {'error': 'Failed to verify OTP'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+        
+
 
 @api_view(['POST'])
 def update_profile(request):
@@ -684,14 +695,14 @@ def submit_student_data(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        existing_data = db.students_data.find_one({"email": email})
+        existing_data = db.students.find_one({"email": email})
         if existing_data:
             return Response(
                 {'error': 'Student data already exists'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        db.students_data.insert_one(data)
+        db.students.update_one(data)
         return Response(
             {'message': 'Student data submitted successfully'},
             status=status.HTTP_201_CREATED
@@ -713,7 +724,7 @@ def get_student_profile(request, user_id):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        student_data = db.students_data.find_one({'email': student['email']})
+        student_data = db.students.find_one({'email': student['email']})
         
         combined_data = {**student, **(student_data if student_data else {})}
         

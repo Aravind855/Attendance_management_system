@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import {
     Box,
     Typography,
-    Container,
+    
     Paper,
     Button,
-    Grid,
+    
     List,
     ListItem,
     ListItemButton,
@@ -19,7 +19,7 @@ import {
     FormControlLabel,
     RadioGroup,
     Radio,
-    FormLabel,
+    
     Table,
     TableBody,
     TableCell,
@@ -72,7 +72,6 @@ const AdminHome = () => {
     const [attendanceSubmitStatus, setAttendanceSubmitStatus] = useState(null);
     const [departmentFilter, setDepartmentFilter] = useState('');
     const [academicYearFilter, setAcademicYearFilter] = useState('');
-    const [attendanceAction, setAttendanceAction] = useState('Present'); 
     const [attendanceChartData, setAttendanceChartData] = useState(null);
     const [attendanceError, setAttendanceError] = useState(null);
     const [attendanceDates, setAttendanceDates] = useState([]);

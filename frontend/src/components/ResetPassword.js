@@ -1,50 +1,47 @@
-import React, { useState } from 'react';
-import { Formik, Form, Field } from 'formik';
-import * as Yup from 'yup';
-import axios from '../config/axios';
-import {
-  Button,
-  TextField,
-  Container,
-  Typography,
-  Box,
-} from '@mui/material';
-import { useNavigate, useLocation } from 'react-router-dom';
-
+import React, { useState } from "react";
+import { Formik, Form, Field } from "formik";
+import * as Yup from "yup";
+import axios from "../config/axios";
+import { Button, TextField, Container, Typography, Box } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 
 const ResetPasswordSchema = Yup.object().shape({
+  email: Yup.string().email("Invalid email").required("Required"),
   new_password: Yup.string()
-    .min(8, 'Password must be at least 8 characters')
-    .matches(/[0-9]/, 'Password must contain at least one number')
-    .matches(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .matches(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .matches(/[^A-Za-z0-9]/, 'Password must contain at least one special character')
-    .required('Required'),
+    .min(8, "Password must be at least 8 characters")
+    .matches(/[0-9]/, "Password must contain at least one number")
+    .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .matches(/[a-z]/, "Password must contain at least one lowercase letter")
+    .matches(
+      /[^A-Za-z0-9]/,
+      "Password must contain at least one special character"
+    )
+    .required("Required"),
   confirm_password: Yup.string()
-    .oneOf([Yup.ref('new_password'), null], 'Passwords must match')
-    .required('Required'),
+    .oneOf([Yup.ref("new_password"), null], "Passwords must match")
+    .required("Required"),
 });
 
 const ResetPassword = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [error, setError] = useState('');
-  const email = location.state?.email;
-
-  if (!email) {
-    navigate('/forgot-password');
-    return null;
-  }
+  const [error, setError] = useState("");
 
   return (
     <Container maxWidth="sm">
-      <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <Box
+        sx={{
+          mt: 8,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
         <Typography component="h1" variant="h5">
           Reset Password
         </Typography>
 
         {error && (
-          <Box sx={{ mb: 2, width: '100%' }}>
+          <Box sx={{ mb: 2, width: "100%" }}>
             <Typography color="error" align="center">
               {error}
             </Typography>
@@ -53,21 +50,24 @@ const ResetPassword = () => {
 
         <Formik
           initialValues={{
-            new_password: '',
-            confirm_password: '',
+            email: "",
+            new_password: "",
+            confirm_password: "",
           }}
           validationSchema={ResetPasswordSchema}
           onSubmit={async (values, { setSubmitting }) => {
             try {
-              setError('');
-              await axios.post('/api/reset-password/', {
-                email,
+              setError("");
+              await axios.post("/api/reset-password/", {
+                email: values.email,
                 new_password: values.new_password,
               });
-              alert('Password reset successful!');
-              navigate('/login');
+              alert("Password reset successful!");
+              navigate("/login");
             } catch (error) {
-              setError(error.response?.data?.error || 'Failed to reset password');
+              setError(
+                error.response?.data?.error || "Failed to reset password"
+              );
             }
             setSubmitting(false);
           }}
@@ -78,13 +78,22 @@ const ResetPassword = () => {
                 as={TextField}
                 fullWidth
                 margin="normal"
+                name="email"
+                label="Email Address"
+                type="email"
+                error={touched.email && errors.email}
+                helperText={touched.email && errors.email}
+              />
+              <Field
+                as={TextField}
+                fullWidth
+                margin="normal"
                 name="new_password"
                 label="New Password"
                 type="password"
                 error={touched.new_password && errors.new_password}
                 helperText={touched.new_password && errors.new_password}
               />
-              
               <Field
                 as={TextField}
                 fullWidth
@@ -95,7 +104,6 @@ const ResetPassword = () => {
                 error={touched.confirm_password && errors.confirm_password}
                 helperText={touched.confirm_password && errors.confirm_password}
               />
-              
               <Button
                 type="submit"
                 fullWidth
@@ -113,4 +121,4 @@ const ResetPassword = () => {
   );
 };
 
-export default ResetPassword; 
+export default ResetPassword;

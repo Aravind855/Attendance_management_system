@@ -99,6 +99,7 @@ const Login = () => {
         email: registrationEmail,
       });
       if (response.status === 200) {
+        localStorage.setItem("userInfo", JSON.stringify({ email: registrationEmail }));
         navigate("/StudentForm", { state: { registrationEmail } });
       } else {
         setRegistrationError("Email not found in student records.");
