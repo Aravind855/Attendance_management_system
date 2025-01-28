@@ -8,16 +8,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:
-    
+
     uri = "mongodb+srv://sutgJxLaXWo7gKMR:sutgJxLaXWo7gKMR@cluster0.2ytii.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-    
+
     logger.info("Attempting to connect to MongoDB Atlas...")
-    
+
     client = MongoClient(uri, server_api=ServerApi('1'))
-    
 
     logger.info("Successfully connected to MongoDB Atlas!")
-    
 
     db = client["Attendance_management_system"]
     users_collection = db["students"]
