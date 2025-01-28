@@ -13,6 +13,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import StudentForm from './components/StudentForm';
 import SuperAdminHome from './components/SuperAdminHome';
 import SessionTimeout from './components/SessionTimeout';
+import ViewReports from './components/ViewReports';
 
 function App() {
   const path = window.location.pathname;
@@ -49,6 +50,7 @@ function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path='/StudentForm' element={<StudentForm/>} />
                 <Route path='/superadmin-home' element={<SuperAdminHome/>} />
+                <Route path="/view-reports" element={<ViewReports />} />
               </Routes>
             </Container>
           </Box>

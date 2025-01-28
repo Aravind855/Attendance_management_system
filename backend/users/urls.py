@@ -52,4 +52,5 @@ urlpatterns = [
         views.mark_attendance,
         name="mark_attendance",
     ),
+    path("api/get-attendance-report/", views.get_attendance_report, name="get_attendance_report"),
 ]
