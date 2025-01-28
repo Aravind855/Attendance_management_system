@@ -21,7 +21,7 @@ try:
 
     db = client["attendance"]
     users_collection = db["students"]
-    admins_collection = db["staffs"]
+    admins_collection = db["staff"]
 
     #
     users_collection.create_index("email", unique=True)

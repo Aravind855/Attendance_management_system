@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Formik, Form, Field } from "formik";
 import * as Yup from "yup";
 import {
@@ -8,9 +8,10 @@ import {
   Typography,
   Box,
   MenuItem,
+  Alert,
 } from "@mui/material";
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const StudentFormSchema = Yup.object().shape({
   name: Yup.string().required("Required"),
@@ -22,12 +23,17 @@ const StudentFormSchema = Yup.object().shape({
   gender: Yup.string().required("Required"),
   dob: Yup.date().required("Required"),
   academic_year: Yup.string().required("Required"),
+  password: Yup.string()
+    .required("Required")
+    .min(6, "Password must be at least 6 characters"),
 });
 
 const StudentForm = () => {
     const navigate = useNavigate();
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    const email = userInfo?.email;
+    const location = useLocation();
+    const registrationEmail = location.state?.registrationEmail;
+    const email = registrationEmail;
+    const [successMessage, setSuccessMessage] = useState('');
 
   return (
     <Container maxWidth="sm">
@@ -43,6 +49,12 @@ const StudentForm = () => {
           Student Form
         </Typography>
 
+        {successMessage && (
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {successMessage}
+          </Alert>
+        )}
+
         <Formik
           initialValues={{
             name: "",
@@ -52,17 +64,26 @@ const StudentForm = () => {
             gender: "",
             dob: "",
             academic_year: "",
+            password: "",
           }}
           validationSchema={StudentFormSchema}
           onSubmit={async (values, { setSubmitting }) => {
             try {
-                const response = await axios.post('http://localhost:8000/api/student-data/', { ...values, email: email }, {
+                console.log("Submitting StudentForm with email:", email);
+
+                const response = await axios.post('/api/student-data/', {
+                    ...values,
+                    email: email
+                }, {
                     headers: {
                         'Content-Type': 'application/json'
                     }
                 });
                 if (response.status === 201) {
-                    navigate('/user-home');
+                    setSuccessMessage('Registration Successful!');
+                    setTimeout(() => {
+                      navigate('/login');
+                    }, 2000);
                 } else {
                     console.error("Failed to submit student data");
                 }
@@ -74,6 +95,14 @@ const StudentForm = () => {
         >
           {({ errors, touched, isSubmitting }) => (
             <Form>
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Email"
+                value={email}
+                disabled
+              />
+
               <Field
                 as={TextField}
                 fullWidth
@@ -113,7 +142,6 @@ const StudentForm = () => {
                 <MenuItem value="ECE">ECE</MenuItem>
                 <MenuItem value="EEE">EEE</MenuItem>
                 <MenuItem value="MECH">MECH</MenuItem>
-                
               </Field>
 
               <Field
@@ -168,6 +196,17 @@ const StudentForm = () => {
                 <MenuItem value="3rd Year">3rd Year</MenuItem>
                 <MenuItem value="4th Year">4th Year</MenuItem>
               </Field>
+
+              <Field
+                as={TextField}
+                fullWidth
+                margin="normal"
+                name="password"
+                label="Password"
+                type="password"
+                error={touched.password && errors.password}
+                helperText={touched.password && errors.password}
+              />
 
               <Button
                 type="submit"

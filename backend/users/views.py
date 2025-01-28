@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.http import JsonResponse
 from django.contrib.auth.hashers import check_password
 from django.core.mail import send_mail, get_connection
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from django.conf import settings
 from .models import CustomUser
 from pymongo.errors import ConnectionFailure, OperationFailure
@@ -13,6 +13,7 @@ import logging
 import random
 from django.core.cache import cache
 import json
+from .models import CustomUser
 from bson import ObjectId
 from django.contrib.auth.hashers import make_password
 
@@ -169,71 +170,125 @@ def register_user(request):
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-@api_view(['POST'])
+@api_view(["POST"])
 def login_user(request):
-    try:
-        email = request.data.get('email')
-        password = request.data.get('password')
-        
-        if not email or not password:
+    email = request.data.get("email")
+    password = request.data.get("password")
+    user_type = request.data.get("user_type")
+
+    if not all([email, password, user_type]):
+        return Response(
+            {"error": "Email, password, and user type are required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if user_type == "Superadmin":
+        admin = db.admin.find_one({"email": email})
+        if admin and check_password(password, admin["password"]):
+            logger.info("Super admin login successful")
             return Response(
-                {'error': 'Email and password are required'}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {
+                    "message": "Login successful",
+                    "id": "superadmin",
+                    "email": "aravindsiva190@gmail.com",
+                    "user_type": "Superadmin",
+                    "is_student": False,
+                    "name": "Super Admin",
+                    "mobile_number": "",
+                    "department": None,
+                },
+                status=status.HTTP_200_OK,
+            )
+        else:
+            return Response(
+                {"error": "Invalid Superadmin credentials"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+    elif user_type == "admin":
+        admin = db.staff.find_one({"email": email})
+        if admin and check_password(password, admin["password"]):
+            logger.info("Admin login successful for user: %s", email)
+            return Response(
+                {
+                    "message": "Login successful",
+                    "id": str(admin["_id"]),
+                    "name": admin["name"],
+                    "user_type": "admin",
+                    "email": admin["email"],
+                    "is_student": False,
+                    "mobile_number": admin.get("mobile_number", ""),
+                    "department": admin.get("department", None),
+                },
+                status=status.HTTP_200_OK,
+            )
+        else:
+            return Response(
+                {"error": "Invalid admin credentials"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+    elif user_type == "staff":
+        staff = db.staff.find_one({"email": email})
+        if staff and check_password(password, staff["password"]):
+            logger.info("Staff login successful for user: %s", email)
+            return Response(
+                {
+                    "message": "Login successful",
+                    "id": str(staff["_id"]),
+                    "name": staff["name"],
+                    "user_type": "staff",
+                    "email": staff["email"],
+                    "is_student": False,
+                    "mobile_number": staff.get("mobile_number", ""),
+                    "department": staff.get("department", None),
+                },
+                status=status.HTTP_200_OK,
+            )
+        else:
+            return Response(
+                {"error": "Invalid staff credentials"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+    elif user_type == "user":
+        if not email.endswith("@snsce.ac.in"):
+            return Response(
+                {"error": "Please use a valid SNSCE email address"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Check in the students collection
         student = db.students.find_one({"email": email})
-        if student and check_password(password, student['password']):
-            response_data = {
-                'id': str(student['_id']),
-                'email': student['email'],
-                'user_type': 'user',
-                'is_student': True,
-                'name': student.get('name', ''),
-                'mobile_number': student.get('mobile_number', '')
-            }
-            logger.info("Student login successful for: %s", email)
-            return Response(response_data)
+        if not student:
+            student_data = {"email": email, "password": make_password(password)}
+            db.students.insert_one(student_data)
+            student = db.students.find_one({"email": email})
 
-        # Check in the staffs collection
-        staff = db.staffs.find_one({"email": email})
-        if staff and check_password(password, staff['password']):
-            response_data = {
-                'id': str(staff['_id']),
-                'name': staff['name'],
-                'email': staff['email'],
-                'user_type': 'admin',
-                'is_student': False,
-                'mobile_number': staff.get('mobile_number', '')
-            }
-            logger.info("Staff login successful for: %s", email)
-            return Response(response_data)
+        if not check_password(password, student["password"]):
+            return Response(
+                {"error": "Invalid student credentials"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        # Check in the admins collection
-        admin = db.admins.find_one({"email": email})
-        if admin and check_password(password, admin['password']):
-            response_data = {
-                'id': str(admin['_id']),
-                'name': admin['name'],
-                'email': admin['email'],
-                'user_type': 'Superadmin',
-                'is_student': False,
-                'mobile_number': admin.get('mobile_number', '')
-            }
-            logger.info("Admin login successful for: %s", email)
-            return Response(response_data)
+        student_data = db.students_data.find_one({"email": email})
+        has_student_data = bool(student_data)
 
-        # If no match found
-        logger.warning("Invalid credentials for user: %s", email)
+        response_data = {
+            "id": str(student["_id"]),
+            "email": student["email"],
+            "user_type": "user",
+            "is_student": True,
+            "name": student.get(
+                "name", ""
+            ),
+            "mobile_number": student.get("mobile_number", ""),
+            "has_student_data": has_student_data,
+            "department": student.get("department", None),
+        }
+        logger.info("Student login successful for: %s", email)
+        return Response(response_data)
+
+    else:
         return Response(
-            {'error': 'Invalid credentials'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    except Exception as e:
-        logger.error("Login error: %s", str(e), exc_info=True)
-        return Response(
-            {'error': 'Login failed'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": "Invalid user type"},
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
 @api_view(['POST'])
