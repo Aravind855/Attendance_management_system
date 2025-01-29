@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { Alert, Snackbar, Button } from "@mui/material";
 
 const SessionTimeout = ({ children }) => {
   const navigate = useNavigate();
@@ -16,9 +17,9 @@ const SessionTimeout = ({ children }) => {
 
     warningTimeoutRef.current = setTimeout(
       () => setShowWarning(true),
-       30 * 1000
+       10 * 1000
     ); // 13 minutes
-    timeoutRef.current = setTimeout(handleLogout, 1 * 60 * 1000); // 15 minutes
+    timeoutRef.current = setTimeout(handleLogout, 10 * 60 * 1000); // 15 minutes
   };
 
   const handleLogout = () => {
@@ -51,14 +52,30 @@ const SessionTimeout = ({ children }) => {
     setIsLoggedIn(!!localStorage.getItem("userInfo"));
   }, [navigate]);
 
-  useEffect(() => {
-    if (showWarning) {
-      alert("Your session will expire soon. Click OK to extend your session.");
-      extendSession();
-    }
-  }, [showWarning]);
-
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <Snackbar
+        open={showWarning}
+        autoHideDuration={6000}
+        onClose={() => setShowWarning(false)}
+        message="Your session will expire soon. Click OK to extend your session."
+        action={
+          <Button color="secondary" size="small" onClick={extendSession}>
+            Extend Session
+          </Button>
+        }
+      >
+        <Alert
+          onClose={() => setShowWarning(false)}
+          severity="warning"
+          sx={{ width: "100%" }}
+        >
+          Your session will expire soon. Click OK to extend your session.
+        </Alert>
+      </Snackbar>
+    </>
+  );
 };
 
 export default SessionTimeout;
