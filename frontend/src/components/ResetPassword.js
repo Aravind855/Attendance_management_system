@@ -1,12 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Formik, Form, Field } from "formik";
 import * as Yup from "yup";
 import axios from "../config/axios";
 import { Button, TextField, Container, Typography, Box } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const ResetPasswordSchema = Yup.object().shape({
-  email: Yup.string().email("Invalid email").required("Required"),
   new_password: Yup.string()
     .min(8, "Password must be at least 8 characters")
     .matches(/[0-9]/, "Password must contain at least one number")
@@ -24,7 +23,20 @@ const ResetPasswordSchema = Yup.object().shape({
 
 const ResetPassword = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [error, setError] = useState("");
+  const email = location.state?.email;
+  const token = location.state?.token;
+
+  useEffect(() => {
+    if (!email || !token) {
+      navigate("/forgot-password");
+    }
+  }, [email, token, navigate]);
+
+  if (!email || !token) {
+    return null;
+  }
 
   return (
     <Container maxWidth="sm">
@@ -50,7 +62,7 @@ const ResetPassword = () => {
 
         <Formik
           initialValues={{
-            email: "",
+            email: email,
             new_password: "",
             confirm_password: "",
           }}
@@ -59,7 +71,7 @@ const ResetPassword = () => {
             try {
               setError("");
               await axios.post("/api/reset-password/", {
-                email: values.email,
+                token,
                 new_password: values.new_password,
               });
               alert("Password reset successful!");
@@ -79,11 +91,14 @@ const ResetPassword = () => {
                 fullWidth
                 margin="normal"
                 name="email"
-                label="Email Address"
+                label="Email"
                 type="email"
+                value={email}
+                disabled
                 error={touched.email && errors.email}
                 helperText={touched.email && errors.email}
               />
+
               <Field
                 as={TextField}
                 fullWidth
@@ -94,6 +109,7 @@ const ResetPassword = () => {
                 error={touched.new_password && errors.new_password}
                 helperText={touched.new_password && errors.new_password}
               />
+
               <Field
                 as={TextField}
                 fullWidth
@@ -104,6 +120,7 @@ const ResetPassword = () => {
                 error={touched.confirm_password && errors.confirm_password}
                 helperText={touched.confirm_password && errors.confirm_password}
               />
+
               <Button
                 type="submit"
                 fullWidth

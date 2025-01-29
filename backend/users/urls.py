@@ -81,4 +81,5 @@ urlpatterns = [
         views.get_attendance_dates,
         name="get_attendance_dates",
     ),
+    path("api/validate-reset-token/", views.validate_reset_token, name="validate_reset_token"),
 ]

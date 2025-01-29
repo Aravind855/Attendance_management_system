@@ -15,7 +15,8 @@ from django.core.cache import cache
 import json
 from bson import ObjectId
 from django.contrib.auth.hashers import make_password
-
+from django.utils.crypto import get_random_string
+from django.utils import timezone
 import re
 
 logger = logging.getLogger(__name__)
@@ -106,35 +107,82 @@ def verify_otp(request):
             identifier = data.get('email') or data.get('phone')
             type = data.get('type')
             user_otp = data.get('otp')
-            
+
             if not all([identifier, type, user_otp]):
                 return JsonResponse({'error': 'Missing required fields'}, status=400)
-            
+
             stored_otp = cache.get(f'otp_{type}_{identifier}')
-            
+
             if not stored_otp:
                 return JsonResponse({'error': 'OTP expired'}, status=400)
-                
+
             if stored_otp != user_otp:
                 return JsonResponse({'error': 'Invalid OTP'}, status=400)
-                
+
             cache.delete(f'otp_{type}_{identifier}')
-            
+
             return JsonResponse({'message': 'OTP verified successfully'})
         except Exception as e:
             logger.error(f"Error in verify_otp: {str(e)}")
             return JsonResponse({'error': 'Internal server error'}, status=500)
-        
-def send_reset_email(email):
-    reset_link = f"http://localhost:3000/reset-password"
-    subject = 'Password Reset Request'
-    message = f'Click the following link to reset your password: {reset_link}'
+
+
+def generate_reset_token():
+    return get_random_string(length=32)
+
+
+def store_reset_token(email, token):
+    expiration_time = timezone.now() + timedelta(minutes=5)
+    # Assuming you have a collection named `reset_tokens`
+    db.reset_tokens.insert_one(
+        {"email": email, "token": token, "expiration_time": expiration_time}
+    )
+
+
+@api_view(["GET"])
+def validate_reset_token(request):
     try:
-        send_mail(subject, message, settings.EMAIL_HOST_USER, [email], fail_silently=False,)
+        token = request.query_params.get("token")
+        if not token:
+            return Response(
+                {"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        reset_token = db.reset_tokens.find_one({"token": token})
+        if not reset_token:
+            return Response(
+                {"error": "Invalid or expired token"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        current_time = timezone.now()
+        if reset_token["expiration_time"] < current_time:
+            return Response(
+                {"error": "Token has expired"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response({"message": "Token is valid", "email": reset_token["email"]})
+    except Exception as e:
+        logger.error(f"Error in validate_reset_token: {str(e)}", exc_info=True)
+        return Response(
+            {"error": "Internal server error"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+def send_reset_email(email, token):
+    reset_link = f"http://localhost:3000/validate-reset-token/?token={token}"
+    subject = "Password Reset Request"
+    message = f"Click the following link to reset your password: {reset_link}"
+    try:
+        send_mail(
+            subject, message, settings.EMAIL_HOST_USER, [email], fail_silently=False
+        )
         return True
     except Exception as e:
         logger.error(f"Error sending reset email: {str(e)}")
         return False
+
 
 @api_view(['POST'])
 def register_user(request):
@@ -390,38 +438,40 @@ def login_user(request):
 @api_view(['POST'])
 def forgot_password(request):
     try:
-        email = request.data.get('email')
+        email = request.data.get("email")
         if not email:
             return Response(
-                {'error': 'Email is required'}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST
             )
-        
-        user = CustomUser.get_user_by_email(email, 'user')
-        admin = CustomUser.get_user_by_email(email, 'admin')
+
+        user = CustomUser.get_user_by_email(email, "user")
+        admin = CustomUser.get_user_by_email(email, "admin")
 
         if not user and not admin:
             return Response(
-                {'error': 'Email not registered'}, 
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Email not registered"}, status=status.HTTP_400_BAD_REQUEST
             )
-        email_sent=send_reset_email(email)
-        otp = CustomUser.generate_otp(email, 'user' if user else 'admin')
+
+        token = generate_reset_token()
+        store_reset_token(email, token)
+
+        email_sent = send_reset_email(
+            email, token
+        )  # Email sending function is called here
         if not email_sent:
             return Response(
-                {'error': 'Failed to send OTP'}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Failed to send reset link"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        
-        return Response({
-            'message': 'OTP sent successfully'
-        })
+
+        return Response({"message": "Reset link sent successfully"})
     except Exception as e:
         logger.error(f"Error in forgot_password: {str(e)}", exc_info=True)
         return Response(
-            {'error': 'Failed to send OTP'}, 
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {"error": "Failed to send OTP"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
 
 @api_view(['POST'])
 def send_signup_otp(request):
@@ -642,7 +692,6 @@ def verify_mobile_otp(request):
             {'error': 'Failed to verify OTP'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-        
 
 
 @api_view(['POST'])
@@ -897,35 +946,45 @@ def check_unassigned_grades(request):
 @api_view(["POST"])
 def reset_password(request):
     try:
-        email = request.data.get("email")
-        new_password = request.data.get("new_password")
-        if not all([email, new_password]):
+        data = request.data
+        token = data.get("token")
+        new_password = data.get("new_password")
+
+        if not token or not new_password:
             return Response(
-                {"error": "Email and new password are required"},
+                {"error": "Token and new password are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = db.staff.find_one({"email": email})
-        student = db.students.find_one({"email": email})
+        reset_token = db.reset_tokens.find_one({"token": token})
+        if not reset_token:
+            return Response(
+                {"error": "Invalid or expired token"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        current_time = timezone.now()
+        if reset_token["expiration_time"] < current_time:
+            return Response(
+                {"error": "Token has expired"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        email = reset_token["email"]
+        user = CustomUser.get_user_by_email(email, "user")
+        admin = CustomUser.get_user_by_email(email, "admin")
 
         if user:
-            db.staff.update_one(
-                {"email": email}, {"$set": {"password": make_password(new_password)}}
-            )
-            return Response({"message": "Password reset successfully"})
-        elif student:
-            db.students.update_one(
-                {"email": email}, {"$set": {"password": make_password(new_password)}}
-            )
-            return Response({"message": "Password reset successfully"})
-        else:
-            return Response(
-                {"error": "Email not registered"}, status=status.HTTP_400_BAD_REQUEST
-            )
+            CustomUser.update_password(email, new_password, "user")
+        elif admin:
+            CustomUser.update_password(email, new_password, "admin")
+
+        db.reset_tokens.delete_one({"token": token})
+
+        return Response({"message": "Password reset successfully"})
     except Exception as e:
         logger.error(f"Error in reset_password: {str(e)}", exc_info=True)
         return Response(
-            {"error": "Failed to reset password"},
+            {"error": "Internal server error"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
@@ -1179,7 +1238,7 @@ def get_attendance_report(request):
      except Exception as e:
          logger.error(f"Error fetching attendance report: {str(e)}", exc_info=True)
          return Response({"error": "Failed to fetch attendance report"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-     
+
 @api_view(["GET"])
 def get_attendance_dates(request):
     try:

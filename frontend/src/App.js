@@ -14,6 +14,7 @@ import StudentForm from "./components/StudentForm";
 import SuperAdminHome from "./components/SuperAdminHome";
 import SessionTimeout from "./components/SessionTimeout";
 import ViewReports from "./components/ViewReports";
+import ValidateResetToken from "./components/ValidateResetToken ";
 
 function App() {
   const path = window.location.pathname;
@@ -56,6 +57,10 @@ function App() {
                 <Route path="/StudentForm" element={<StudentForm />} />
                 <Route path="/superadmin-home" element={<SuperAdminHome />} />
                 <Route path="/view-reports" element={<ViewReports />} />
+                <Route
+                  path="/validate-reset-token"
+                  element={<ValidateResetToken />}
+                />
               </Routes>
             </Container>
           </Box>
